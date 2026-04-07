@@ -5,13 +5,18 @@ class Config(BaseConfig):
     def __init__(self):
         super(Config, self).__init__()
 
-        self.model_type = "DyAD"
-        self.name = "DyAD"
+        self.num_epochs = 100
+
+        self.brand_num: int = 3
+
+        self.model_type = "AE"
+        self.name = "AE"
 
         self.unlock()
         # Add more configuration parameters as needed
 
-        self.ckpt_path = "working/checkpoints/RFDBattery/DyAD_20260407_151238/best_rec_f1.pth"
+        self.rnn_input_size: int = 7  # Hidden size for rnn layers
+        self.fusion_embed_dim: int = 32  # Embedding dimension for fusion layers
 
         # Lock the config to prevent further modifications
         self.lock()

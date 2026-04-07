@@ -5,13 +5,21 @@ class Config(BaseConfig):
     def __init__(self):
         super(Config, self).__init__()
 
+        self.num_epochs = 100
+
+        self.brand_num: int = 3
+
         self.model_type = "LSTM"
         self.name = "LSTM"
 
         self.unlock()
         # Add more configuration parameters as needed
 
-        self.ckpt_path = "working/checkpoints/RFDBattery/LSTM_20260407_151309/best_rec.pth"
+        self.rnn_input_size: int = 7  # Hidden size for rnn layers
+        self.rnn_num_layers: int = 3  # Number of rnn layers
+        self.rnn_bidirectional: bool = True  # Whether to use bidirectional rnn
+
+        self.fusion_embed_dim: int = 100  # Embedding dimension for fusion layers
 
         # Lock the config to prevent further modifications
         self.lock()
