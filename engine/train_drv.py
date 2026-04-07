@@ -189,10 +189,10 @@ class TrainEngine(object):
             meta_test = pd.read_csv(os.path.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "label", "test_label.csv"))
             car_ids = list(set(meta_train["car"].unique().tolist() + meta_test["car"].unique().tolist()))
 
-            # Remove car 230 from car_ids if brand_num is 2
-            if self.cfg.brand_num == 2 and 230 in car_ids:
-                car_ids.remove(230)
-                print("Removed car 230 from training set for brand 2")
+            # Remove car 230, 232 from car_ids if brand_num is 2
+            if self.cfg.brand_num == 2:
+                car_ids = [car_id for car_id in car_ids if car_id not in [230, 232]]
+                print("Removed car 230 and 232 from training set for brand_num 2")
                 print("Remaining car ids for training:", car_ids)
 
         for idx, car_id in enumerate(car_ids):
