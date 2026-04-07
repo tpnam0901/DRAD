@@ -24,7 +24,7 @@ class DRV(nn.Module):
         self.regression = nn.Linear(cfg.rnn_embed_dim * 2 if cfg.rnn_bidirectional else 1, len(self.output_features))
         # Mileage
         self.regression_mileage = nn.Sequential(
-            nn.Linear(128 * cfg.rnn_embed_dim, 512),
+            nn.Linear(128 * cfg.rnn_embed_dim * 2 if cfg.rnn_bidirectional else 1, 512),
             nn.ReLU(),
             nn.Linear(512, 1),
         )
