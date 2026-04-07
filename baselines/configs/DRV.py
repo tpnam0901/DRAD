@@ -15,12 +15,9 @@ class Config(BaseConfig):
         self.unlock()
         # Add more configuration parameters as needed
 
-        self.rnn_num_layers: int = 2  # Number of rnn layers
+        self.rnn_num_layers: int = 1  # Number of rnn layers
         self.rnn_bidirectional: bool = True  # Whether to use bidirectional rnn
-
-        self.rnn_embed_dim: int = 64  # Embedding dimension for fusion layers
-        self.fusion_num_heads: int = 8  # Number of heads for multi-head
-        self.fourier_fusion_dropout: float = 0.2  # Dropout for Fourier fusion layer
+        self.rnn_embed_dim: int = 256  # Embedding dimension for fusion layers
 
         self.input_features = [
             "normed_soc",

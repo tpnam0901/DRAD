@@ -3,9 +3,9 @@ import os.path as osp
 
 import torch
 
-from configs.STFNetAblationSpec import Config
+from configs.DRV import Config
 
-from .train_stfnet_wo_spec import TrainEngine
+from .train_drv import TrainEngine
 
 
 class EvaluateEngine(TrainEngine):
