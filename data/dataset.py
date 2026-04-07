@@ -121,6 +121,7 @@ def build_dataset(
     car_id: int = -1,
     logger: logging.Logger = logging.getLogger(__name__),
     verbose: bool = True,
+    train_include: bool = False,
 ) -> BaseDataset:
 
     data_root = os.path.join(data_root, "battery_brand{}".format(brand_num))
@@ -145,6 +146,23 @@ def build_dataset(
             continue
         X.append(data_path)
         y.append((data_path, row["label"], row["car"], row["mileage"], row["charge_segment"]))
+
+    if train_include and mode != "train":
+        metadata_path = os.path.join(data_root, "drv_{}_labels.csv".format(mode))
+        df = pd.read_csv(metadata_path)
+        # If train_include is True, include all data for training, even if car_id is specified
+        for _, row in tqdm(df.iterrows(), disable=not verbose):
+            data_path = os.path.join(data_root, "train", row["filename"])
+            if not os.path.exists(data_path):
+                data_path = os.path.join(data_root, "test", row["filename"])
+            if not os.path.exists(data_path):
+                data_path = os.path.join(data_root, "data", row["filename"])
+            assert os.path.exists(data_path), "Data path does not exist: {}".format(data_path)
+            if car_id != -1 and int(row["car"]) == car_id:
+                continue
+            X.append(data_path)
+            y.append((data_path, row["label"], row["car"], row["mileage"], row["charge_segment"]))
+
     dataset = BaseDataset(X, y, column, verbose=verbose)
 
     return dataset
