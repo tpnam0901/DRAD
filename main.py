@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     args = arg_parser()
     cfg: Config = import_config(args.config)
-    if args.engine == "e":
+    if args.engine == "e" and cfg.model_type == "DRV":
         assert args.config_ckpt != "", "Checkpoint configuration file must be provided for Evaluate engines."
         cfg.load(args.config_ckpt)
 
@@ -56,6 +56,14 @@ if __name__ == "__main__":
     if cfg.model_type == "DRV":
         from engine.eval_drv import EvaluateEngine
         from engine.train_drv import TrainEngine
+    elif cfg.model_type == "AE":
+        from engine.eval_ae import EvaluateEngine
+    elif cfg.model_type == "LSTM":
+        from engine.eval_lstm import EvaluateEngine
+    elif cfg.model_type == "DyAD":
+        from engine.eval_dyad import EvaluateEngine
+    elif cfg.model_type == "TransGAN":
+        from engine.eval_transgan import EvaluateEngine
     else:
         raise NotImplementedError(f"Model type {cfg.model_type} not implemented for CL mode.")
 
