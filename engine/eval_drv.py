@@ -1,4 +1,5 @@
 import logging
+import os
 import os.path as osp
 import random
 from typing import Dict, List, Tuple
@@ -16,13 +17,13 @@ from data.dataset import build_dataset
 
 from .train_drv import TrainEngine
 
-logging.basicConfig(level=logging.INFO, format="%(name)s - %(levelname)s - %(message)s")
-
 
 class EvaluateEngine(TrainEngine):
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self.logger = logging.getLogger("TrainEngine")
+        self.logger.level = logging.INFO
+        self.logger.debug("THIS IS A TEST LOGGING DEBUG MESSAGE. IF YOU SEE THIS, LOGGING WORKS!")
 
         self.alpha = 1
         self.beta = 2
@@ -210,7 +211,9 @@ class EvaluateEngine(TrainEngine):
         plt.ylabel("EV Data ID")
         plt.title("Error Matrix of Models vs. Data. Abnormal EV is: EV " + str(abnormal_car))
         plt.tight_layout()
-        save_path = osp.join(self.cfg.checkpoint_dir, "{}_{}".format(self.cfg.name, self.cfg.current_time), f"cm_acar_{abnormal_car}.png")
+        save_dir = osp.join(self.cfg.checkpoint_dir, "{}_{}".format(self.cfg.name, self.cfg.current_time))
+        os.makedirs(save_dir, exist_ok=True)
+        save_path = osp.join(save_dir, f"cm_acar_{abnormal_car}.png")
         plt.savefig(save_path)
 
         # For each row_i and col_i, find sum of that row and column as the error score of that car
@@ -231,7 +234,7 @@ class EvaluateEngine(TrainEngine):
         save_path = osp.join(self.cfg.checkpoint_dir, "{}_{}".format(self.cfg.name, self.cfg.current_time), f"ces_acar_{abnormal_car}.png")
         plt.savefig(save_path)
 
-    def select_groups(self, cars_normal, cars_abnormal, num_normal=-1, num_abnormal=1, seed=2025):
+    def select_groups(self, cars_normal, cars_abnormal, num_normal=-1, num_abnormal=1, seed=42):
         random.seed(seed)
         np.random.seed(seed)
         selected_groups = []
@@ -278,16 +281,16 @@ class EvaluateEngine(TrainEngine):
         return selected_groups
 
     def load_checkpoint(self, model, prefix: str = "latest"):
-        """Save model checkpoint.
+        """Load model checkpoint.
 
         Args:
             epoch (int): Current epoch number.
             keep_only_latest (bool): Whether to keep only the latest checkpoint. If True, save with the name 'latest.pth'.
         """
         ckpt_path = osp.join(self.cfg.checkpoint_dir, "{}_{}".format(self.cfg.name, self.cfg.current_time), prefix + ".pth")
-        torch.save(model.state_dict(), ckpt_path)
+        model.load_state_dict(torch.load(ckpt_path))
 
-    def calculate_score(self, predictions: Dict, targets_dict: Dict) -> Dict:
+    def calculate_score(self, predictions: Dict, targets_dict: Dict):
         """Calculate loss given predictions and targets.
 
         Args:
@@ -338,6 +341,7 @@ class EvaluateEngine(TrainEngine):
                 car_id=car_id,
                 logger=self.logger,
                 verbose=False,
+                train_include=False,
             )
             test_dataset.set_min_max_mileage(min_mileage, max_mileage)
             test_dataloader = self.get_dataloader(
