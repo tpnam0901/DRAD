@@ -51,6 +51,8 @@ def main(data_root: str):
             # Use the first 80% charge segments for training, and the rest for testing
             num_charge_segments = len(sorted_charge_segments)
             num_train_segments = int(num_charge_segments * 0.8)
+            if car_id == 232:
+                continue
             for i, (charge_segment, data) in enumerate(sorted_charge_segments):
                 if i < num_train_segments:
                     train_data += data
