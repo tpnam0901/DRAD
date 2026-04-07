@@ -11,9 +11,9 @@ class DRV(nn.Module):
         self.output_features = cfg.output_features
 
         # --------- Time series - AE
-        self.encoder_rnn = nn.GRU(
+        self.rnn = nn.GRU(
             input_size=len(self.input_features),
-            hidden_size=cfg.rnn_embed_dim // 2 if cfg.rnn_bidirectional else cfg.rnn_embed_dim,
+            hidden_size=cfg.rnn_embed_dim,
             num_layers=cfg.rnn_num_layers,
             bidirectional=cfg.rnn_bidirectional,
             batch_first=True,
@@ -21,7 +21,7 @@ class DRV(nn.Module):
 
         # -------- Output layers
         # Volt, current, soc, max_single_volt, min_single_volt, max_temp, min_temp
-        self.regression = nn.Linear(cfg.rnn_embed_dim, len(self.output_features))
+        self.regression = nn.Linear(cfg.rnn_embed_dim * 2 if cfg.rnn_bidirectional else 1, len(self.output_features))
         # Mileage
         self.regression_mileage = nn.Sequential(
             nn.Linear(128 * cfg.rnn_embed_dim, 512),
@@ -36,7 +36,7 @@ class DRV(nn.Module):
         input_features = torch.stack(input_features, dim=2)
 
         # -------- Begin Time series features
-        feat_series_encoder, _ = self.encoder_rnn(input_features)
+        feat_series_encoder, _ = self.rnn(input_features)
 
         # Reconstruction for volt, current, soc, max_single_volt, min_single_volt, max_temp, min_temp
         logits_reconstruction = self.regression(feat_series_encoder)  # B x L x H_in
