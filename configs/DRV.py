@@ -5,12 +5,13 @@ class Config(BaseConfig):
     def __init__(self):
         super(Config, self).__init__()
 
-        self.num_epochs = 500
+        self.num_epochs = 1000
 
-        self.brand_num: int = 3
+        self.brand_num: int = 2
 
         self.model_type = "DRV"
-        self.name = "DRV"
+        self.name = "DRV_wo_mileage_brand{}".format(self.brand_num)
+        # self.name = "DRV_brand{}".format(self.brand_num)
 
         self.unlock()
         # Add more configuration parameters as needed

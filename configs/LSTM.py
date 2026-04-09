@@ -11,7 +11,5 @@ class Config(BaseConfig):
         self.unlock()
         # Add more configuration parameters as needed
 
-        self.ckpt_path = "working/checkpoints/RFDBattery/LSTM_20260407_151309/best_rec.pth"
-
         # Lock the config to prevent further modifications
         self.lock()
