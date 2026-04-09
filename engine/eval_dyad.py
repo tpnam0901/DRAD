@@ -42,5 +42,5 @@ class EvaluateEngine(EvaluateEngineBase):
             epoch (int): Current epoch number.
             keep_only_latest (bool): Whether to keep only the latest checkpoint. If True, save with the name 'latest.pth'.
         """
-        ckpt_path = osp.join(self.cfg.checkpoint_dir, "{}_{}".format(self.cfg.name, self.cfg.current_time), "best_f1_rec.pth")
+        ckpt_path = osp.join(self.cfg.checkpoint_dir, "{}_{}".format(self.cfg.name, self.cfg.current_time), "best_rec_f1.pth")
         model.load_state_dict(torch.load(ckpt_path))
