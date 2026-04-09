@@ -7,15 +7,15 @@ class Config(BaseConfig):
 
         self.num_epochs = 100
 
-        self.brand_num: int = 3
+        self.brand_num: int = 2
 
         self.model_type = "DRV"
-        self.name = "DRV"
+        self.name = "DRV_cl_brand{}".format(self.brand_num)
 
         self.unlock()
         # Add more configuration parameters as needed
 
-        self.rnn_num_layers: int = 1  # Number of rnn layers
+        self.rnn_num_layers: int = 2  # Number of rnn layers
         self.rnn_bidirectional: bool = True  # Whether to use bidirectional rnn
         self.rnn_embed_dim: int = 256  # Embedding dimension for fusion layers
 

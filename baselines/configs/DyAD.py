@@ -7,10 +7,10 @@ class Config(BaseConfig):
 
         self.num_epochs = 100
 
-        self.brand_num: int = 3
+        self.brand_num: int = 2
 
         self.model_type = "DyAD"
-        self.name = "DyAD"
+        self.name = "DyAD_brand{}".format(self.brand_num)
 
         if self.model_type == "DyAD":
             self.batch_size = 128

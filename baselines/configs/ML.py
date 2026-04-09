@@ -11,4 +11,4 @@ class Config(BaseConfig):
         # Lock the config to prevent further modifications
         self.lock()
         self.model_type = "MachineLearningModel"
-        self.name = "MachineLearningModel"
+        self.name = "MachineLearningModel_brand{}".format(self.brand_num)

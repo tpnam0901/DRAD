@@ -77,7 +77,7 @@ class Config(BaseConfig):
         self.description = "default"
 
         # --------------------------------- Training settings
-        self.seed: int = 42
+        self.seed: int = 2025
         self.batch_size: int = 128
         self.num_epochs: int = 100
         self.checkpoint_dir: str = "working/checkpoints/RFDBattery"
@@ -93,7 +93,7 @@ class Config(BaseConfig):
         self.alpha: float = 2.0
 
         # --------------------------------- Optimizer
-        self.optimizer: str = "adamw"
+        self.optimizer: str = "sgd"
         self.learning_rate: float = 1e-3
         self.weight_decay: float = 1e-4
         self.betas: Tuple[float, float] = (0.9, 0.999)

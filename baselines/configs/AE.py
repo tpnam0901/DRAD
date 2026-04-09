@@ -7,10 +7,10 @@ class Config(BaseConfig):
 
         self.num_epochs = 100
 
-        self.brand_num: int = 3
+        self.brand_num: int = 2
 
         self.model_type = "AE"
-        self.name = "AE"
+        self.name = "AE_brand{}".format(self.brand_num)
 
         self.unlock()
         # Add more configuration parameters as needed
