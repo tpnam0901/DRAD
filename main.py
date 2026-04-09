@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     args = arg_parser()
     cfg: Config = import_config(args.config)
-    if args.engine == "e" and cfg.model_type == "DRV":
+    if args.engine == "e":
         assert args.config_ckpt != "", "Checkpoint configuration file must be provided for Evaluate engines."
         cfg.load(args.config_ckpt)
 
