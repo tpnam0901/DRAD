@@ -35,6 +35,12 @@ def arg_parser():
         required=True,
         help="Engine type to use: TrainEngine (t), EvaluateEngine (e).",
     )
+    parser.add_argument(
+        "-c",
+        "--cross",
+        action="store_true",
+        help="Whether to use the cross-evaluation engine (applicable for EvaluateEngine).",
+    )
     return parser.parse_args()
 
 
@@ -55,7 +61,11 @@ if __name__ == "__main__":
 
     if cfg.model_type == "DRV":
         from engine.eval_drv import EvaluateEngine
-        from engine.train_drv import TrainEngine
+
+        if args.cross:
+            from engine.eval_drv_cross import EvaluateEngine
+        else:
+            from engine.train_drv import TrainEngine
     elif cfg.model_type == "AE":
         from engine.eval_ae import EvaluateEngine
     elif cfg.model_type == "LSTM":

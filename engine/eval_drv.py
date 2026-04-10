@@ -215,6 +215,7 @@ class EvaluateEngine(TrainEngine):
         os.makedirs(save_dir, exist_ok=True)
         save_path = osp.join(save_dir, f"cm_acar_{abnormal_car}.png")
         plt.savefig(save_path)
+        plt.close()
 
         # For each row_i and col_i, find sum of that row and column as the error score of that car
         car_error_scores = {}
@@ -233,6 +234,7 @@ class EvaluateEngine(TrainEngine):
         plt.tight_layout()
         save_path = osp.join(self.cfg.checkpoint_dir, "{}_{}".format(self.cfg.name, self.cfg.current_time), f"ces_acar_{abnormal_car}.png")
         plt.savefig(save_path)
+        plt.close()
 
     def select_groups(self, cars_normal, cars_abnormal, num_normal=-1, num_abnormal=1, seed=42):
         random.seed(seed)
@@ -254,7 +256,7 @@ class EvaluateEngine(TrainEngine):
 
             # Repeat normal cars to ensure we have enough normal cars for each group
             normal_indices = []
-            for i in range(5):
+            for i in range(10):
                 indices = list(range(len(cars_normal)))
                 random.shuffle(indices)
                 normal_indices.extend(indices)
@@ -262,21 +264,22 @@ class EvaluateEngine(TrainEngine):
             abnormal_idx = 0
             normal_idx = 0
 
-            selected_abnormal_cars = []
-            for _ in range(num_abnormal):
-                if abnormal_idx >= len(abnormal_indices):
-                    break
-                selected_abnormal_cars.append(cars_abnormal[abnormal_indices[abnormal_idx]])
-                abnormal_idx += 1
-            selected_normals = []
-            for _ in range(num_normal):
-                if normal_idx >= len(normal_indices):
-                    raise ValueError(
-                        "Not enough normal cars to select from. Please increase the number of normal cars or reduce num_normal."
-                    )
-                selected_normals.append(cars_normal[normal_indices[normal_idx]])
-                normal_idx += 1
-            selected_groups.append(selected_normals + selected_abnormal_cars)
+            while abnormal_idx < len(abnormal_indices):
+                selected_abnormal_cars = []
+                for _ in range(num_abnormal):
+                    if abnormal_idx >= len(abnormal_indices):
+                        continue
+                    selected_abnormal_cars.append(cars_abnormal[abnormal_indices[abnormal_idx]])
+                    abnormal_idx += 1
+                selected_normals = []
+                for _ in range(num_normal):
+                    if normal_idx >= len(normal_indices):
+                        raise ValueError(
+                            "Not enough normal cars to select from. Please increase the number of normal cars or reduce num_normal."
+                        )
+                    selected_normals.append(cars_normal[normal_indices[normal_idx]])
+                    normal_idx += 1
+                selected_groups.append(selected_normals + selected_abnormal_cars)
 
         return selected_groups
 
@@ -381,9 +384,7 @@ class EvaluateEngine(TrainEngine):
 
         return each_car_errors
 
-    def run(self):
-        """Run the training process."""
-
+    def build_car_groups(self, num_normal=-1, num_abnormal=1, seed=42) -> List[List[int]]:
         car_normal_ids = []
         cars_abnormal_ids = []
         if self.cfg.brand_num == 3:
@@ -392,13 +393,30 @@ class EvaluateEngine(TrainEngine):
             car_normal_ids = meta_data[meta_data["label"] == 0]["car"].unique().tolist()
             cars_abnormal_ids = meta_data[meta_data["label"] == 1]["car"].unique().tolist()
         else:
-            raise NotImplementedError(f"Brand number {self.cfg.brand_num} not implemented for dataset loading.")
+            meta_train = pd.read_csv(os.path.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "label", "train_label.csv"))
+            meta_test = pd.read_csv(os.path.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "label", "test_label.csv"))
+            car_normal_ids = (
+                meta_train[meta_train["label"] == 0]["car"].unique().tolist() + meta_test[meta_test["label"] == 0]["car"].unique().tolist()
+            )
+            cars_abnormal_ids = (
+                meta_train[meta_train["label"] == 1]["car"].unique().tolist() + meta_test[meta_test["label"] == 1]["car"].unique().tolist()
+            )
+
+            # Remove car id 232 and 230 from dataset.
+            car_normal_ids = [car_id for car_id in car_normal_ids if car_id not in [232, 230]]
 
         print("Normal cars:", car_normal_ids, "\nAbnormal cars:", cars_abnormal_ids)
 
+        selected_groups = self.select_groups(car_normal_ids, cars_abnormal_ids, num_normal=num_normal, num_abnormal=num_abnormal, seed=seed)
+
+        return selected_groups
+
+    def run(self):
+        """Run the training process."""
+
         num_normal = -1
         num_abnormal = 1
-        selected_groups = self.select_groups(car_normal_ids, cars_abnormal_ids, num_normal=num_normal, num_abnormal=num_abnormal)
+        selected_groups = self.build_car_groups(num_normal=num_normal, num_abnormal=num_abnormal, seed=42)
 
         eval_metrics_dict = {"mean_std": {}, "iqr": {}, "grouping": {}}
 
