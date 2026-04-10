@@ -10,7 +10,7 @@ from .eval_drv import EvaluateEngine as BaseEvaluateEngine
 
 class EvaluateEngine(BaseEvaluateEngine):
 
-    def build_car_groups(self, num_normal=-1, num_abnormal=1) -> List[List[int]]:
+    def build_car_groups(self, num_normal=-1, num_abnormal=1, seed=42) -> List[List[int]]:
         car_normal_ids = []
         cars_abnormal_ids = []
 
@@ -33,7 +33,7 @@ class EvaluateEngine(BaseEvaluateEngine):
 
         print("Normal cars:", car_normal_ids, "\nAbnormal cars:", cars_abnormal_ids)
 
-        selected_groups = self.select_groups(car_normal_ids, cars_abnormal_ids, num_normal=num_normal, num_abnormal=num_abnormal)
+        selected_groups = self.select_groups(car_normal_ids, cars_abnormal_ids, num_normal=num_normal, num_abnormal=num_abnormal, seed=seed)
 
         return selected_groups
 
