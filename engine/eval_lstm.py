@@ -1,46 +1,29 @@
+import logging
 import os.path as osp
-from typing import Dict
 
 import torch
 
-import networks
+from configs.LSTM import Config
 
-from .eval_drv import EvaluateEngine as EvaluateEngineBase
+from .train_lstm import TrainEngine
 
 
-class EvaluateEngine(EvaluateEngineBase):
-    def build_model(self):
-        """Build the model for training."""
-        return networks.LSTM(self.cfg)
+class EvaluateEngine(TrainEngine):
+    def __init__(self, cfg: Config):
+        self.cfg = cfg
+        self.logger = logging.getLogger("TrainEngine")
 
-    def calculate_score(self, predictions: Dict, targets_dict: Dict):
-        """Calculate loss given predictions and targets.
+    def run(self):
+        """Run the training process."""
+        self.criterion_mse = torch.nn.MSELoss(reduction="none")
+        _, test_dataset, _, _ = self.load_data()
 
-        Args:
-            predictions (Dict): Model predictions.
-            targets_dict (Dict): Ground truth targets.
-        Returns:
-            Dict: Calculated loss values.
-        """
-
-        # Initialize loss functions
-        if not hasattr(self, "criterion_mse"):
-            self.criterion_mse = torch.nn.MSELoss(reduction="none")
-
-        # Reconstruction loss
-        logits_rec = predictions["logits_rec"]
-
-        normed_time_series = targets_dict["normed_voltage"].unsqueeze(2)
-        loss_reg = self.criterion_mse(logits_rec, normed_time_series).mean(dim=[1, 2])
-
-        return loss_reg
-
-    def load_checkpoint(self, model, prefix: str = "latest"):
-        """Load model checkpoint.
-
-        Args:
-            epoch (int): Current epoch number.
-            keep_only_latest (bool): Whether to keep only the latest checkpoint. If True, save with the name 'latest.pth'.
-        """
+        model = self.build_model()
         ckpt_path = osp.join(self.cfg.checkpoint_dir, "{}_{}".format(self.cfg.name, self.cfg.current_time), "best_rec.pth")
-        model.load_state_dict(torch.load(ckpt_path))
+        model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+        model.load_state_dict(torch.load(ckpt_path, map_location=torch.device("cuda" if torch.cuda.is_available() else "cpu")))
+
+        metric_dict, _ = self.evaluate(model, test_dataset)
+        print("Evaluation results for best_rec.pth:")
+        for key, value in metric_dict.items():
+            print(f"Test {key}: {value:.4f}")

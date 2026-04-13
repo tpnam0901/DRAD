@@ -8,24 +8,24 @@ class LSTM(nn.Module):
         super(LSTM, self).__init__()
 
         # --------- Time series - VAE
-        self.fusion_embed_dim = 100
-        self.bidirectional = True
-        self.num_layers = 3
+        self.fusion_embed_dim = cfg.fusion_embed_dim
+        self.bidirectional = cfg.rnn_bidirectional
+        self.num_layers = cfg.rnn_num_layers
 
         self.rnn = nn.LSTM(
-            input_size=7,
-            hidden_size=self.fusion_embed_dim // 2 if self.bidirectional else self.fusion_embed_dim,
-            num_layers=self.num_layers,
-            bidirectional=self.bidirectional,
+            input_size=cfg.rnn_input_size,
+            hidden_size=cfg.fusion_embed_dim // 2 if cfg.rnn_bidirectional else cfg.fusion_embed_dim,
+            num_layers=cfg.rnn_num_layers,
+            bidirectional=cfg.rnn_bidirectional,
             batch_first=True,
         )
 
         # -------- Output layers
         # Volt, current, soc, max_single_volt, min_single_volt, max_temp, min_temp
-        self.regression = nn.Linear(self.fusion_embed_dim, 1)
+        self.regression = nn.Linear(cfg.fusion_embed_dim, 1)
         # Mileage
         self.regression_mileage = nn.Sequential(
-            nn.Linear(128 * self.fusion_embed_dim, 512),
+            nn.Linear(128 * cfg.fusion_embed_dim, 512),
             nn.ReLU(),
             nn.Linear(512, 1),
         )

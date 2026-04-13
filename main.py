@@ -18,7 +18,7 @@ def arg_parser():
         "-cfg",
         "--config",
         type=str,
-        default="configs/DRV.py",
+        default="configs/STFNet.py",
         help="Path to the configuration file.",
     )
     parser.add_argument(
@@ -36,10 +36,11 @@ def arg_parser():
         help="Engine type to use: TrainEngine (t), EvaluateEngine (e).",
     )
     parser.add_argument(
-        "-c",
-        "--cross",
-        action="store_true",
-        help="Whether to use the cross-evaluation engine (applicable for EvaluateEngine).",
+        "-m",
+        "--mode",
+        choices=["CL", "DRV"],
+        default="CL",
+        help="Training mode: Central or DRV.",
     )
     return parser.parse_args()
 
@@ -59,23 +60,46 @@ if __name__ == "__main__":
     torch.cuda.manual_seed(SEED)
     torch.cuda.manual_seed_all(SEED)
 
-    if cfg.model_type == "DRV":
-        from engine.eval_drv import EvaluateEngine
+    if args.mode == "CL":
+        if cfg.model_type == "DyAD":
+            from engine.train_dyad import TrainEngine
 
-        if args.cross:
-            from engine.eval_drv_cross import EvaluateEngine
-        else:
+            from engine.eval_drv_dyad import EvaluateEngine
+        elif cfg.model_type == "TransGAN":
+            from engine.train_transgan import TrainEngine
+
+            from engine.eval_drv_transgan import EvaluateEngine
+        elif cfg.model_type == "AE":
+            from engine.train_ae import TrainEngine
+
+            from engine.eval_drv_ae import EvaluateEngine
+        elif cfg.model_type == "LSTM":
+            from engine.train_lstm import TrainEngine
+
+            from engine.eval_drv_lstm import EvaluateEngine
+        elif cfg.model_type == "MachineLearningModel":
+            from engine.run_ml import TrainEngine
+            from engine.run_ml import TrainEngine as EvaluateEngine
+        elif cfg.model_type == "DRV":
+            from engine.eval_drv import EvaluateEngine
             from engine.train_drv import TrainEngine
-    elif cfg.model_type == "AE":
-        from engine.eval_ae import EvaluateEngine
-    elif cfg.model_type == "LSTM":
-        from engine.eval_lstm import EvaluateEngine
-    elif cfg.model_type == "DyAD":
-        from engine.eval_dyad import EvaluateEngine
-    elif cfg.model_type == "TransGAN":
-        from engine.eval_transgan import EvaluateEngine
+        else:
+            raise NotImplementedError(f"Model type {cfg.model_type} not implemented for CL mode.")
+    elif args.mode == "DRV":
+        if args.engine == "t":
+            raise NotImplementedError("Training engine for DRV mode is not implemented.")
+        if cfg.model_type == "AE":
+            from engine.eval_drv_ae import EvaluateEngine
+        elif cfg.model_type == "DyAD":
+            from engine.eval_drv_dyad import EvaluateEngine
+        elif cfg.model_type == "TransGAN":
+            from engine.eval_drv_transgan import EvaluateEngine
+        elif cfg.model_type == "LSTM":
+            from engine.eval_drv_lstm import EvaluateEngine
+        else:
+            raise NotImplementedError(f"Model type {cfg.model_type} not implemented for DRV mode.")
     else:
-        raise NotImplementedError(f"Model type {cfg.model_type} not implemented for CL mode.")
+        raise NotImplementedError(f"Mode {args.mode} not implemented.")
 
     if args.engine == "t":
         trainer = TrainEngine(cfg)

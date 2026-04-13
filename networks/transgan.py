@@ -159,40 +159,34 @@ class TransGANDecoder(nn.Module):
 class TransGAN(nn.Module):
     def __init__(self, cfg: Config):
         super(TransGAN, self).__init__()
-        transgan_input_embedding_dimension = 128
-        transgan_dropout_pe = 0.1
-        transgan_num_attention_heads = 8
-        transgan_dropout_attention = 0.1
-        transgan_num_encoder_layers = 3
-        transgan_num_decoder_layers = 3
-        transgan_hidden_layers = 512
-        self.projection = nn.Linear(3, transgan_input_embedding_dimension)
-        self.pe = PositionalEncoding(d_model=transgan_input_embedding_dimension, dropout=transgan_dropout_pe)
+
+        self.projection = nn.Linear(3, cfg.transgan_input_embedding_dimension)
+        self.pe = PositionalEncoding(d_model=cfg.transgan_input_embedding_dimension, dropout=cfg.transgan_dropout_pe)
 
         self.encoder = nn.Sequential(
             *[
                 TransGANEncoder(
-                    embed_dim=transgan_input_embedding_dimension,
-                    num_heads=transgan_num_attention_heads,
-                    dropout=transgan_dropout_attention,
+                    embed_dim=cfg.transgan_input_embedding_dimension,
+                    num_heads=cfg.transgan_num_attention_heads,
+                    dropout=cfg.transgan_dropout_attention,
                 )
-                for _ in range(transgan_num_encoder_layers)
+                for _ in range(cfg.transgan_num_encoder_layers)
             ]
         )
 
         self.decoder = nn.Sequential(
             *[
                 TransGANDecoder(
-                    embed_dim=transgan_input_embedding_dimension,
-                    num_heads=transgan_num_attention_heads,
-                    dropout=transgan_dropout_attention,
+                    embed_dim=cfg.transgan_input_embedding_dimension,
+                    num_heads=cfg.transgan_num_attention_heads,
+                    dropout=cfg.transgan_dropout_attention,
                 )
-                for _ in range(transgan_num_decoder_layers)
+                for _ in range(cfg.transgan_num_decoder_layers)
             ]
         )
 
-        self.hidden = nn.Linear(transgan_input_embedding_dimension, transgan_hidden_layers)
-        self.linear = nn.Linear(transgan_hidden_layers, 1)
+        self.hidden = nn.Linear(cfg.transgan_input_embedding_dimension, cfg.transgan_hidden_layers)
+        self.linear = nn.Linear(cfg.transgan_hidden_layers, 1)
 
     def create_time_series_data(self, inputs: Dict[str, torch.Tensor]):
         """

@@ -77,9 +77,10 @@ class Config(BaseConfig):
         self.description = "default"
 
         # --------------------------------- Training settings
-        self.seed: int = 42
+        self.seed: int = 2025
         self.batch_size: int = 128
         self.num_epochs: int = 1000
+        self.fold_num: int = 0
         self.checkpoint_dir: str = "working/checkpoints/RFDBattery"
         self.current_time: str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         self.use_amp: bool = False
@@ -99,7 +100,7 @@ class Config(BaseConfig):
         self.betas: Tuple[float, float] = (0.9, 0.999)
         self.eps: float = 1e-8
         self.amsgard: bool = False
-        self.momentum: float = 0.99
+        self.momentum: float = 0.9
 
         # --------------------------------- Scheduler
         self.lr_scheduler: str = "StepLR"

@@ -9,16 +9,15 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch
+from data.dataset import build_dataset
 from sklearn import metrics
 from tqdm.auto import tqdm
 
+import networks
 from configs.DRV import Config
-from data.dataset import build_dataset
-
-from .train_drv import TrainEngine
 
 
-class EvaluateEngine(TrainEngine):
+class EvaluateEngine(object):
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self.logger = logging.getLogger("TrainEngine")
@@ -305,6 +304,10 @@ class EvaluateEngine(TrainEngine):
 
         return loss_reg
 
+    def build_model(self):
+        """Build the model for training."""
+        return getattr(networks, self.cfg.model_type)(self.cfg)
+
     def eval_group(self, group: List[int]) -> Dict:
         all_datasets = {}
         for car_id in group:
@@ -316,33 +319,23 @@ class EvaluateEngine(TrainEngine):
                 brand_num = 3
 
             train_dataset = build_dataset(
-                data_root=self.cfg.data_root,
-                brand_num=brand_num,
+                self.cfg.data_root,
+                brand_num=self.cfg.brand_num,
                 mode="train",
-                car_id=car_id,
-                logger=self.logger,
-                verbose=False,
+                car_ids=[car_id],
+                fold_num=self.cfg.fold_num,
             )
             min_mileage, max_mileage = train_dataset.get_min_max_mileage()
             test_dataset = build_dataset(
-                data_root=self.cfg.data_root,
-                brand_num=brand_num,
-                mode="test",
-                car_id=car_id,
-                logger=self.logger,
-                verbose=False,
-                train_include=False,
+                self.cfg.data_root,
+                brand_num=self.cfg.brand_num,
+                mode="val",
+                car_ids=[car_id],
+                fold_num=self.cfg.fold_num,
             )
             test_dataset.set_min_max_mileage(min_mileage, max_mileage)
-            test_dataloader = self.get_dataloader(
-                test_dataset,
-                batch_size=self.cfg.batch_size,
-                shuffle=False,
-                num_workers=self.cfg.num_workers,
-                drop_last=False,
-            )
 
-            all_datasets[car_id] = test_dataloader
+            all_datasets[car_id] = test_dataset
 
         each_car_errors = {}
         for car_id in tqdm(group):
@@ -351,19 +344,22 @@ class EvaluateEngine(TrainEngine):
 
             model.eval()
             model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-            for car_data_id, car_dataloader in all_datasets.items():
+            for car_data_id, car_dataset in all_datasets.items():
                 total_error = 0.0
                 total_data = 0
                 with torch.no_grad():
-                    for batch in car_dataloader:
-                        batch = {
-                            key: value.to(torch.device("cuda" if torch.cuda.is_available() else "cpu")) for key, value in batch.items()
-                        }
-                        outputs = model(batch)
-                        scores = self.calculate_score(outputs, batch)
-                        for s in scores:
-                            total_error += s
-                            total_data += 1
+                    for samples in car_dataset:
+                        for batch in samples:
+                            for k, v in batch.items():
+                                batch[k] = v.unsqueeze(0)
+                            batch = {
+                                key: value.to(torch.device("cuda" if torch.cuda.is_available() else "cpu")) for key, value in batch.items()
+                            }
+                            outputs = model(batch)
+                            scores = self.calculate_score(outputs, batch)
+                            for s in scores:
+                                total_error += s
+                                total_data += 1
                 avg_error = total_error / total_data
                 car_dict = each_car_errors.get(car_id, {})
                 car_dict[car_data_id] = avg_error

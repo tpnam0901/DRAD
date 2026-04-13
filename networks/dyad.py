@@ -23,23 +23,23 @@ class DyAD(nn.Module):
         cfg: Config,
     ):
         super().__init__()
-        rnn_type = "gru"
-        hidden_size = 256
-        latent_size = 16
-        num_layers = 1
-        bidirectional = True
-        variable_length = False
-        encoder_embedding_size = 7
-        decoder_embedding_size = 2
-        output_embedding_size = 5
+        rnn_type = cfg.dyad_rnn_type
+        hidden_size = cfg.dyad_hidden_size
+        latent_size = cfg.dyad_latent_size
+        num_layers = cfg.dyad_num_layers
+        bidirectional = cfg.dyad_bidirectional
+        variable_length = cfg.dyad_variable_length
+        encoder_embedding_size = cfg.dyad_encoder_embedding_size
+        decoder_embedding_size = cfg.dyad_decoder_embedding_size
+        output_embedding_size = cfg.dyad_output_embedding_size
 
-        self.feature_split = 2
+        self.feature_split = cfg.dyad_decoder_embedding_size
         self.latent_size = latent_size
         self.bidirectional = bidirectional
         self.num_layers = num_layers
         self.hidden_size = hidden_size
         self.variable_length = variable_length
-        self.noise_scale = 0.01
+        self.noise_scale = cfg.dyad_noise_scale
 
         rnn = eval("nn." + rnn_type.upper())
 

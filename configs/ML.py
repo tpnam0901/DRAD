@@ -1,4 +1,4 @@
-from configs.DRV import Config as BaseConfig
+from configs.base import Config as BaseConfig
 
 
 class Config(BaseConfig):
@@ -8,8 +8,7 @@ class Config(BaseConfig):
         self.unlock()
         # Add more configuration parameters as needed
 
-        self.brand_2_name = ""
-        self.brand_2_current_time = ""
-
         # Lock the config to prevent further modifications
         self.lock()
+        self.model_type = "MachineLearningModel"
+        self.name = "MachineLearningModel_brand{}".format(self.brand_num)
