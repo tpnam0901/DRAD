@@ -62,27 +62,23 @@ if __name__ == "__main__":
 
     if args.mode == "CL":
         if cfg.model_type == "DyAD":
+            from engine.eval_dyad import EvaluateEngine
             from engine.train_dyad import TrainEngine
-
-            from engine.eval_drv_dyad import EvaluateEngine
         elif cfg.model_type == "TransGAN":
+            from engine.eval_transgan import EvaluateEngine
             from engine.train_transgan import TrainEngine
-
-            from engine.eval_drv_transgan import EvaluateEngine
         elif cfg.model_type == "AE":
+            from engine.eval_ae import EvaluateEngine
             from engine.train_ae import TrainEngine
-
-            from engine.eval_drv_ae import EvaluateEngine
         elif cfg.model_type == "LSTM":
+            from engine.eval_lstm import EvaluateEngine
             from engine.train_lstm import TrainEngine
-
-            from engine.eval_drv_lstm import EvaluateEngine
         elif cfg.model_type == "MachineLearningModel":
             from engine.run_ml import TrainEngine
             from engine.run_ml import TrainEngine as EvaluateEngine
         elif cfg.model_type == "DRV":
             from engine.eval_drv import EvaluateEngine
-            from engine.train_drv import TrainEngine
+            from engine.train_cl_drv import TrainEngine
         else:
             raise NotImplementedError(f"Model type {cfg.model_type} not implemented for CL mode.")
     elif args.mode == "DRV":
