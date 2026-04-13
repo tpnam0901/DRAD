@@ -22,40 +22,27 @@ class EvaluateEngine(TrainEngine):
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self.logger = logging.getLogger("TrainEngine")
-        self.logger.level = logging.INFO
+        self.logger.level = logging.DEBUG
         self.logger.debug("THIS IS A TEST LOGGING DEBUG MESSAGE. IF YOU SEE THIS, LOGGING WORKS!")
 
         self.alpha = 1
         self.beta = 2
 
-    def calculate_metrics(self, preds: np.ndarray, targets: np.ndarray, num_linspace: int = 1000) -> Dict:
+    def calculate_metrics(self, preds: np.ndarray, targets: np.ndarray) -> Dict:
         """Calculate metrics given predictions and targets."""
         metric_dict = {}
-        for threshold in np.linspace(np.min(preds), np.max(preds), num=num_linspace):
-            precision = metrics.precision_score(targets, preds >= threshold, average="binary", zero_division=0)
-            recall = metrics.recall_score(targets, preds >= threshold, average="binary", zero_division=0)
-            f1 = metrics.f1_score(targets, preds >= threshold, average="binary", zero_division=0)
-            accuracy = metrics.accuracy_score(targets, preds >= threshold)
-            if f1 > metric_dict.get("f1", -1):
-                metric_dict["accuracy"] = accuracy
-                metric_dict["precision"] = precision
-                metric_dict["recall"] = recall
-                metric_dict["f1"] = f1
-                metric_dict["best_threshold"] = threshold
+
+        metric_dict["accuracy"] = metrics.accuracy_score(targets, preds)
+        metric_dict["f1"] = metrics.f1_score(targets, preds, average="binary", zero_division=0)
+        metric_dict["precision"] = metrics.precision_score(targets, preds, average="binary", zero_division=0)
+        metric_dict["recall"] = metrics.recall_score(targets, preds, average="binary", zero_division=0)
 
         return metric_dict
 
-    def export_confusion_matrix(self, preds: np.ndarray, targets: np.ndarray, num_linspace: int = 1000, prefix: str = ""):
+    def export_confusion_matrix(self, preds: np.ndarray, targets: np.ndarray, prefix: str = ""):
         """Export confusion matrix given predictions and targets."""
-        best_threshold = None
-        best_f1 = -1
-        for threshold in np.linspace(np.min(preds), np.max(preds), num=num_linspace):
-            f1 = metrics.f1_score(targets, preds >= threshold, average="binary", zero_division=0)
-            if f1 > best_f1:
-                best_f1 = f1
-                best_threshold = threshold
 
-        cm = metrics.confusion_matrix(targets, preds >= best_threshold)
+        cm = metrics.confusion_matrix(targets, preds)
         # Move 1s to the top-left corner and 0s to the bottom-right corner
         cm = np.array([[cm[1, 1], cm[1, 0]], [cm[0, 1], cm[0, 0]]])
         # Plot confusion matrix
