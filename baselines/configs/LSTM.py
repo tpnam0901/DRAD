@@ -5,13 +5,9 @@ class Config(BaseConfig):
     def __init__(self):
         super(Config, self).__init__()
 
-        self.num_epochs = 100
-
-        self.brand_num: int = 3
-
         self.optimizer = "adamw"
         self.model_type = "LSTM"
-        self.name = "LSTM_brand{}".format(self.brand_num)
+        self.name = "LSTM_cl_brand{}".format(self.brand_num)
 
         self.unlock()
         # Add more configuration parameters as needed

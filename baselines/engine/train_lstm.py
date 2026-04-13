@@ -59,32 +59,35 @@ class TrainEngine(BaseTrainEngine):
 
         return loss_dict, metric_dict
 
-    def evaluate(self, model, dataloader):
+    def evaluate(self, model, dataset):
         """Evaluate the model on the given dataloader."""
         model.eval()
 
         # For each car, calculate the average score across all its samples and use that for evaluation
         car_scores_rec = {}
         car_labels = {}
-        for batch in tqdm(dataloader, ascii=True, desc="Evaluating"):
-            car_ids = batch["car"].detach().cpu().numpy().tolist()
-            labels = batch["label"].detach().cpu().numpy().tolist()
-            batch = {key: value.to(torch.device("cuda" if torch.cuda.is_available() else "cpu")) for key, value in batch.items()}
-            with torch.no_grad():
-                outputs = model(batch)
-                scores_rec = (
-                    self.criterion_mse(outputs["logits_rec"], batch["normed_voltage"].unsqueeze(-1))
-                    .mean(dim=[1, 2])
-                    .detach()
-                    .cpu()
-                    .tolist()
-                )
+        for samples in tqdm(dataset, ascii=True, desc="Evaluating"):
+            for batch in samples:
+                for k, v in batch.items():
+                    batch[k] = v.unsqueeze(0)
+                car_ids = batch["car"].detach().cpu().numpy().tolist()
+                labels = batch["label"].detach().cpu().numpy().tolist()
+                batch = {key: value.to(torch.device("cuda" if torch.cuda.is_available() else "cpu")) for key, value in batch.items()}
+                with torch.no_grad():
+                    outputs = model(batch)
+                    scores_rec = (
+                        self.criterion_mse(outputs["logits_rec"], batch["normed_voltage"].unsqueeze(-1))
+                        .mean(dim=[1, 2])
+                        .detach()
+                        .cpu()
+                        .tolist()
+                    )
 
-            for car_id, label, score_rec in zip(car_ids, labels, scores_rec):
-                if car_id not in car_scores_rec:
-                    car_scores_rec[car_id] = []
-                car_scores_rec[car_id].append(score_rec)
-                car_labels[car_id] = label
+                for car_id, label, score_rec in zip(car_ids, labels, scores_rec):
+                    if car_id not in car_scores_rec:
+                        car_scores_rec[car_id] = []
+                    car_scores_rec[car_id].append(score_rec)
+                    car_labels[car_id] = label
 
         # Average scores for each car
         car_avg_scores_rec = {car_id: np.mean(scores) for car_id, scores in car_scores_rec.items()}

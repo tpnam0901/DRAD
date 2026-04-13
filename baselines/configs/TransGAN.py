@@ -5,12 +5,8 @@ class Config(BaseConfig):
     def __init__(self):
         super(Config, self).__init__()
 
-        self.num_epochs = 100
-
-        self.brand_num: int = 2
-
         self.model_type = "TransGAN"
-        self.name = "TransGAN_brand{}".format(self.brand_num)
+        self.name = "TransGAN_cl_brand{}".format(self.brand_num)
 
         self.unlock()
         # Add more configuration parameters as needed

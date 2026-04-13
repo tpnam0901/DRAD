@@ -79,7 +79,8 @@ class Config(BaseConfig):
         # --------------------------------- Training settings
         self.seed: int = 2025
         self.batch_size: int = 128
-        self.num_epochs: int = 100
+        self.num_epochs: int = 1000
+        self.fold_num: int = 0
         self.checkpoint_dir: str = "working/checkpoints/RFDBattery"
         self.current_time: str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         self.use_amp: bool = False
@@ -88,7 +89,7 @@ class Config(BaseConfig):
 
         # --------------------------------- Dataset
         self.data_root: str = "working/dataset/RFDBattery"
-        self.brand_num: int = 1
+        self.brand_num: int = 3
         self.num_workers: int = 8
         self.alpha: float = 2.0
 

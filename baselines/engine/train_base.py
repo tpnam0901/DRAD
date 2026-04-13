@@ -6,15 +6,16 @@ from typing import Dict
 import matplotlib.pyplot as plt
 import mlflow
 import numpy as np
+import pandas as pd
 import seaborn as sns
 import torch
+from data.dataset import build_dataset
 from sklearn import metrics
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
 import networks
 from configs.base import Config
-from data.dataset import build_dataset
 from utils import optimizers, schedulers
 
 plt.rcParams["font.family"] = "Times New Roman"
@@ -63,26 +64,24 @@ class TrainEngine(object):
         self.logger.info(f"MLflow run started with ID: {self.mlflow_id} and name: {self.mlflow_run_name}")
         mlflow.end_run()
 
-    def load_train_dataset(self):
+    def load_train_dataset(self, car_ids):
         """Load the training dataset."""
         return build_dataset(
             self.cfg.data_root,
-            self.cfg.alpha,
             brand_num=self.cfg.brand_num,
             mode="train",
-            removeAbnormal=False,
-            logger=self.logger,
+            car_ids=car_ids,
+            fold_num=self.cfg.fold_num,
         )
 
-    def load_test_dataset(self):
-        """Load the test dataset."""
+    def load_test_dataset(self, car_ids):
+        """Load the training dataset."""
         return build_dataset(
             self.cfg.data_root,
-            self.cfg.alpha,
             brand_num=self.cfg.brand_num,
-            mode="test",
-            removeAbnormal=False,
-            logger=self.logger,
+            mode="val",
+            car_ids=car_ids,
+            fold_num=self.cfg.fold_num,
         )
 
     def get_dataloader(
@@ -261,7 +260,7 @@ class TrainEngine(object):
                         mlflow.log_metric("train_{}".format(key), value, step=self.global_step)
                 scheduler.step()
 
-    def evaluate(self, model, dataloader):
+    def evaluate(self, model, dataset):
         """Evaluate the model on the given dataloader."""
         model.eval()
 
@@ -269,22 +268,27 @@ class TrainEngine(object):
         car_scores_cls = {}
         car_scores_rec = {}
         car_labels = {}
-        for batch in tqdm(dataloader, ascii=True, desc="Evaluating"):
-            car_ids = batch["car"].detach().cpu().numpy().tolist()
-            labels = batch["label"].detach().cpu().numpy().tolist()
-            batch = {key: value.to(torch.device("cuda" if torch.cuda.is_available() else "cpu")) for key, value in batch.items()}
-            with torch.no_grad():
-                outputs = model(batch)
-                scores_cls = outputs["logits_cls"].sigmoid().squeeze().detach().cpu().numpy().tolist()
-                scores_rec = self.criterion_mse(outputs["logits_rec"], batch["normed_time_series"]).mean(dim=[1, 2]).detach().cpu().tolist()
+        for samples in tqdm(dataset, ascii=True, desc="Evaluating"):
+            for batch in samples:
+                for k, v in batch.items():
+                    batch[k] = v.unsqueeze(0)
+                car_ids = batch["car"].detach().cpu().numpy().tolist()
+                labels = batch["label"].detach().cpu().numpy().tolist()
+                batch = {key: value.to(torch.device("cuda" if torch.cuda.is_available() else "cpu")) for key, value in batch.items()}
+                with torch.no_grad():
+                    outputs = model(batch)
+                    scores_cls = outputs["logits_cls"].sigmoid().squeeze().detach().cpu().numpy().tolist()
+                    scores_rec = (
+                        self.criterion_mse(outputs["logits_rec"], batch["normed_time_series"]).mean(dim=[1, 2]).detach().cpu().tolist()
+                    )
 
-            for car_id, label, score_cls, score_rec in zip(car_ids, labels, scores_cls, scores_rec):
-                if car_id not in car_scores_cls:
-                    car_scores_cls[car_id] = []
-                    car_scores_rec[car_id] = []
-                car_scores_cls[car_id].append(score_cls)
-                car_scores_rec[car_id].append(score_rec)
-                car_labels[car_id] = label
+                for car_id, label, score_cls, score_rec in zip(car_ids, labels, scores_cls, scores_rec):
+                    if car_id not in car_scores_cls:
+                        car_scores_cls[car_id] = []
+                        car_scores_rec[car_id] = []
+                    car_scores_cls[car_id].append(score_cls)
+                    car_scores_rec[car_id].append(score_rec)
+                    car_labels[car_id] = label
 
         # Average scores for each car
         car_avg_scores_cls = {car_id: np.mean(scores) for car_id, scores in car_scores_cls.items()}
@@ -306,12 +310,14 @@ class TrainEngine(object):
 
         return metric_dict, (car_labels, car_avg_scores_cls, car_avg_scores_rec)
 
-    def run(self):
-        """Run the training process."""
+    def load_data(self):
+        car_info = pd.read_csv("/home/phuongnam/DistributedEVTest/data/battery_data/battery_brand3/label/all_label.csv")
+        car_normal_ids = car_info[car_info["label"] == 0]["car"].unique().tolist()
+        car_abnormal_ids = car_info[car_info["label"] == 1]["car"].unique().tolist()
 
-        train_dataset = self.load_train_dataset()
+        train_dataset = self.load_train_dataset(car_normal_ids)
         min_mileage, max_mileage = train_dataset.get_min_max_mileage()
-        test_dataset = self.load_test_dataset()
+        test_dataset = self.load_test_dataset(car_normal_ids + car_abnormal_ids)
         test_dataset.set_min_max_mileage(min_mileage, max_mileage)
 
         train_dataloader = self.get_dataloader(
@@ -320,12 +326,12 @@ class TrainEngine(object):
             shuffle=True,
             num_workers=self.cfg.num_workers,
         )
-        test_dataloader = self.get_dataloader(
-            test_dataset,
-            batch_size=self.cfg.batch_size,
-            shuffle=False,
-            num_workers=self.cfg.num_workers,
-        )
+        return train_dataloader, test_dataset, car_normal_ids, car_abnormal_ids
+
+    def run(self):
+        """Run the training process."""
+
+        train_dataloader, test_dataset, car_normal_ids, car_abnormal_ids = self.load_data()
 
         model = self.build_model()
         model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
@@ -341,7 +347,7 @@ class TrainEngine(object):
 
             with mlflow.start_run(run_name=self.mlflow_run_name, run_id=self.mlflow_id):
                 mlflow.log_metric("learning_rate", scheduler.get_last_lr()[0], step=self.global_step)
-                metric_dict, _ = self.evaluate(model, test_dataloader)
+                metric_dict, _ = self.evaluate(model, test_dataset)
                 for key, value in metric_dict.items():
                     self.logger.info(f"Test {key}: {value:.4f}")
                     mlflow.log_metric("test_{}".format(key), value, step=self.global_step)

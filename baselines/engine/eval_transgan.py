@@ -17,24 +17,14 @@ class EvaluateEngine(TrainEngine):
         if not hasattr(self, "criterion_mse_eval"):
             self.criterion_mse_eval = torch.nn.MSELoss(reduction="none")
 
-        train_dataset = self.load_train_dataset()
-        min_mileage, max_mileage = train_dataset.get_min_max_mileage()
-        test_dataset = self.load_test_dataset()
-        test_dataset.set_min_max_mileage(min_mileage, max_mileage)
-
-        test_dataloader = self.get_dataloader(
-            test_dataset,
-            batch_size=self.cfg.batch_size,
-            shuffle=False,
-            num_workers=self.cfg.num_workers,
-        )
+        _, test_dataset, _, _ = self.load_data()
 
         model_gen, _ = self.build_model()
         ckpt_path = osp.join(self.cfg.checkpoint_dir, "{}_{}".format(self.cfg.name, self.cfg.current_time), "best_rec_f1.pth")
         model_gen.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
         model_gen.load_state_dict(torch.load(ckpt_path, map_location=torch.device("cuda" if torch.cuda.is_available() else "cpu")))
 
-        metric_dict, _ = self.evaluate(model_gen, test_dataloader)
+        metric_dict, _ = self.evaluate(model_gen, test_dataset)
         print("Evaluation results for best_rec_f1.pth:")
         for key, value in metric_dict.items():
             print(f"Test {key}: {value:.4f}")
