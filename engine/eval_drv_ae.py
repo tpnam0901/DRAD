@@ -30,7 +30,14 @@ class EvaluateEngine(EvaluateEngineBase):
         # Reconstruction loss
         logits_rec = predictions["logits_rec"]
 
-        normed_time_series = targets_dict["normed_time_series"]
+        normed_time_series = torch.stack(
+            [
+                targets_dict["normed_voltage"],
+                targets_dict["normed_max_cell_voltage"],
+                targets_dict["normed_min_cell_voltage"],
+            ],
+            dim=-1,
+        )
         loss_reg = self.criterion_mse(logits_rec, normed_time_series).mean(dim=[1, 2])
 
         return loss_reg

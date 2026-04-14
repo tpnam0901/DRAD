@@ -11,7 +11,7 @@ class Config(BaseConfig):
         self.unlock()
         # Add more configuration parameters as needed
 
-        self.rnn_input_size: int = 7  # Hidden size for rnn layers
+        self.rnn_input_size: int = 4  # Hidden size for rnn layers
         self.fusion_embed_dim: int = 32  # Embedding dimension for fusion layers
 
         # Lock the config to prevent further modifications
