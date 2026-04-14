@@ -34,7 +34,14 @@ class TrainEngine(BaseTrainEngine):
 
         # Reconstruction loss
         logits_rec = predictions["logits_rec"]
-        normed_time_series = targets_dict["normed_voltage"].unsqueeze(-1)  # B x L x 1
+        normed_time_series = torch.stack(
+            [
+                targets_dict["normed_voltage"],
+                targets_dict["normed_max_cell_voltage"],
+                targets_dict["normed_min_cell_voltage"],
+            ],
+            dim=-1,
+        )
         loss_reg = self.criterion_smoothl1(logits_rec, normed_time_series).mean(dim=[1, 2])
         loss_reg = loss_reg * inverted_labels  # Only calculate reconstruction loss for normal samples (label=0)
         loss_reg = loss_reg.mean()
@@ -53,7 +60,14 @@ class TrainEngine(BaseTrainEngine):
         optimizer.step()
 
         predictions = outputs["logits_rec"]
-        normed_time_series = batch["normed_voltage"].unsqueeze(-1)  # B x L x 1
+        normed_time_series = torch.stack(
+            [
+                batch["normed_voltage"],
+                batch["normed_max_cell_voltage"],
+                batch["normed_min_cell_voltage"],
+            ],
+            dim=-1,
+        )
         scores_rec = self.criterion_mse(predictions, normed_time_series).mean(dim=[1, 2]).detach().cpu().numpy()
         metric_dict = self.calculate_metrics(scores_rec, batch["label"].detach().cpu().numpy(), num_linspace=5)
 
@@ -75,13 +89,15 @@ class TrainEngine(BaseTrainEngine):
                 batch = {key: value.to(torch.device("cuda" if torch.cuda.is_available() else "cpu")) for key, value in batch.items()}
                 with torch.no_grad():
                     outputs = model(batch)
-                    scores_rec = (
-                        self.criterion_mse(outputs["logits_rec"], batch["normed_voltage"].unsqueeze(-1))
-                        .mean(dim=[1, 2])
-                        .detach()
-                        .cpu()
-                        .tolist()
+                    normed_time_series = torch.stack(
+                        [
+                            batch["normed_voltage"],
+                            batch["normed_max_cell_voltage"],
+                            batch["normed_min_cell_voltage"],
+                        ],
+                        dim=-1,
                     )
+                    scores_rec = self.criterion_mse(outputs["logits_rec"], normed_time_series).mean(dim=[1, 2]).detach().cpu().tolist()
 
                 for car_id, label, score_rec in zip(car_ids, labels, scores_rec):
                     if car_id not in car_scores_rec:
