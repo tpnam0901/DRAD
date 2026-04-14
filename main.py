@@ -79,6 +79,9 @@ if __name__ == "__main__":
         elif cfg.model_type == "DRV":
             from engine.eval_drv import EvaluateEngine
             from engine.train_cl_drv import TrainEngine
+        elif cfg.model_type == "CNN":
+            from engine.eval_cnn import EvaluateEngine
+            from engine.train_cnn import TrainEngine
         else:
             raise NotImplementedError(f"Model type {cfg.model_type} not implemented for CL mode.")
     elif args.mode == "DRV":
@@ -92,6 +95,8 @@ if __name__ == "__main__":
             from engine.eval_drv_transgan import EvaluateEngine
         elif cfg.model_type == "LSTM":
             from engine.eval_drv_lstm import EvaluateEngine
+        elif cfg.model_type == "CNN":
+            from engine.eval_drv_cnn import EvaluateEngine
         else:
             raise NotImplementedError(f"Model type {cfg.model_type} not implemented for DRV mode.")
     else:
