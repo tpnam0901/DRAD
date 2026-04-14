@@ -4,6 +4,7 @@ import os.path as osp
 from typing import Dict
 
 import numpy as np
+import pandas as pd
 from sklearn import metrics
 from sklearn.decomposition import PCA
 from sklearn.ensemble import IsolationForest
@@ -38,26 +39,24 @@ class TrainEngine(object):
         file_handler.setFormatter(formatter)
         self.logger.addHandler(file_handler)
 
-    def load_train_dataset(self):
+    def load_train_dataset(self, car_ids):
         """Load the training dataset."""
         return build_dataset(
             self.cfg.data_root,
-            self.cfg.alpha,
             brand_num=self.cfg.brand_num,
             mode="train",
-            removeAbnormal=False,
-            logger=self.logger,
+            car_ids=car_ids,
+            fold_num=self.cfg.fold_num,
         )
 
-    def load_test_dataset(self):
-        """Load the test dataset."""
+    def load_test_dataset(self, car_ids):
+        """Load the training dataset."""
         return build_dataset(
             self.cfg.data_root,
-            self.cfg.alpha,
             brand_num=self.cfg.brand_num,
-            mode="test",
-            removeAbnormal=False,
-            logger=self.logger,
+            mode="val",
+            car_ids=car_ids,
+            fold_num=self.cfg.fold_num,
         )
 
     def get_dataloader(
@@ -95,26 +94,29 @@ class TrainEngine(object):
         metric_dict["accuracy"] = metrics.accuracy_score(targets, preds)
         return metric_dict
 
-    def run(self):
-        """Run the training process."""
+    def load_data(self):
+        car_info = pd.read_csv("/home/phuongnam/DistributedEVTest/data/battery_data/battery_brand3/label/all_label.csv")
+        car_normal_ids = car_info[car_info["label"] == 0]["car"].unique().tolist()
+        car_abnormal_ids = car_info[car_info["label"] == 1]["car"].unique().tolist()
 
-        train_dataset = self.load_train_dataset()
+        train_dataset = self.load_train_dataset(car_normal_ids)
         min_mileage, max_mileage = train_dataset.get_min_max_mileage()
-        test_dataset = self.load_test_dataset()
+        test_dataset = self.load_test_dataset(car_normal_ids + car_abnormal_ids)
         test_dataset.set_min_max_mileage(min_mileage, max_mileage)
 
         train_dataloader = self.get_dataloader(
             train_dataset,
-            batch_size=self.cfg.batch_size,
+            batch_size=1,
             shuffle=True,
             num_workers=self.cfg.num_workers,
+            drop_last=False,
         )
-        test_dataloader = self.get_dataloader(
-            test_dataset,
-            batch_size=self.cfg.batch_size,
-            shuffle=False,
-            num_workers=self.cfg.num_workers,
-        )
+        return train_dataloader, test_dataset, car_normal_ids, car_abnormal_ids
+
+    def run(self):
+        """Run the training process."""
+
+        train_dataloader, test_dataset, car_normal_ids, car_abnormal_ids = self.load_data()
 
         x_train = []
         y_train = []
@@ -124,12 +126,13 @@ class TrainEngine(object):
             x_train.append(normed_time_series)
 
             label = batch["label"].flatten().detach().cpu().numpy()
-            # For each label, repeat 128 times to match the shape of normed_time_series
-            label_train = np.repeat(label, normed_time_series.shape[0] // label.shape[0])
+            label = np.repeat(label, normed_time_series.shape[0])  # Repeat label to match the shape of normed_time_series
             car_id = batch["car"].flatten().detach().cpu().numpy()
+            car_id = np.repeat(car_id, normed_time_series.shape[0])  # Repeat car_id to match the shape of normed_time_series
             charge_id = batch["charge_segment"].flatten().detach().cpu().numpy()
+            charge_id = np.repeat(charge_id, normed_time_series.shape[0])  # Repeat charge_id to match the shape of normed_time_series
             y_train.append(np.stack([label, car_id, charge_id], axis=1))
-            y_train_label.append(label_train)
+            y_train_label.append(label)
 
         x_train = np.concatenate(x_train, axis=0)
         y_train = np.concatenate(y_train, axis=0)
@@ -140,17 +143,25 @@ class TrainEngine(object):
 
         x_test = []
         y_test = []
-        for batch in tqdm(test_dataloader, desc="Extracting features from test data"):
-            normed_time_series = batch["normed_time_series"].flatten(0, 1).detach().cpu().numpy()
-            x_test.append(normed_time_series)
-
-            label = batch["label"].flatten().detach().cpu().numpy()
-            car_id = batch["car"].flatten().detach().cpu().numpy()
-            charge_id = batch["charge_segment"].flatten().detach().cpu().numpy()
-            y_test.append(np.stack([label, car_id, charge_id], axis=1))
+        y_test_label = []
+        for samples in tqdm(test_dataset, desc="Extracting features from test data"):
+            for batch in samples:
+                for k, v in batch.items():
+                    batch[k] = v.unsqueeze(0)
+                normed_time_series = batch["normed_time_series"].flatten(0, 1).detach().cpu().numpy()
+                x_test.append(normed_time_series)
+                label = batch["label"].flatten().detach().cpu().numpy()
+                label = np.repeat(label, normed_time_series.shape[0])  # Repeat label to match the shape of normed_time_series
+                car_id = batch["car"].flatten().detach().cpu().numpy()
+                car_id = np.repeat(car_id, normed_time_series.shape[0])  # Repeat car_id to match the shape of normed_time_series
+                charge_id = batch["charge_segment"].flatten().detach().cpu().numpy()
+                charge_id = np.repeat(charge_id, normed_time_series.shape[0])  # Repeat charge_id to match the shape of normed_time_series
+                y_test.append(np.stack([label, car_id, charge_id], axis=1))
+                y_test_label.append(label)
 
         x_test = np.concatenate(x_test, axis=0)
         y_test = np.concatenate(y_test, axis=0)
+        y_test_label = np.concatenate(y_test_label, axis=0)
         self.logger.info(f"Test data shape: {x_test.shape}")
         self.logger.info(f"Test labels shape: {y_test.shape}")
 
@@ -188,9 +199,6 @@ class TrainEngine(object):
             for car_id, counts in car_charge_counts.items():
                 num_anomalies = counts["anomalies"]
                 num_total = counts["total"]
-                # print(
-                #     f"Car ID: {car_id}, Anomalies: {num_anomalies}, Total: {num_total}, Ratio: {num_anomalies / num_total:.4f}"
-                # )  # Debugging counts
                 y_pred_pca.append(1 if (num_anomalies / num_total) > ratio else 0)
                 y_true.append(1 if car_id in y_test[y_test[:, 0] == 1][:, 1] else 0)
             y_pred_pca = np.array(y_pred_pca)
@@ -263,13 +271,13 @@ class TrainEngine(object):
             self.logger.info(f"Test {key}: {value:.4f}")
 
         self.logger.info("---------------- Starting KNN-based anomaly detection on test data ---------------")
+
         knn = KNeighborsClassifier(n_neighbors=5)
-        knn.fit(x_train, y_train_label)  # Use label for training
+        knn.fit(x_train, y_train[:, 0])  # Use label for training
         y_pred = knn.predict(x_test)
         y_true = y_test[:, 0]  # Use label for evaluation
         self.logger.info(f"Predicted anomalies: {np.sum(y_pred)}, {y_pred}")
         self.logger.info(f"True anomalies: {np.sum(y_true)}, {y_true}")
-
         car_charge_counts = {}
         for (label, car_id, charge_id), anomaly in zip(y_test, y_pred == 1):
             if car_id not in car_charge_counts:
@@ -280,7 +288,7 @@ class TrainEngine(object):
 
         best_y_pred_knn = []
         best_y_true = []
-        best_f1 = 0
+        best_f1 = -1
         best_ratio = 0
         for ratio in tqdm(range(3000)):
             ratio = ratio / 1000
