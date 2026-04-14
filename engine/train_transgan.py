@@ -1,11 +1,11 @@
 import mlflow
 import numpy as np
 import torch
-from data.dataset import build_dataset
 from tqdm.auto import tqdm
 
 import networks
 from configs.TransGAN import Config
+from data.dataset import build_dataset
 
 from .train_base import TrainEngine as BaseTrainEngine
 
@@ -32,7 +32,14 @@ class TrainEngine(BaseTrainEngine):
         model_dis.train()
 
         fake_data = model_gen(batch)["logits_rec"]
-        real_data = batch["normed_voltage"].unsqueeze(-1)  # B x L x 1
+        real_data = torch.stack(
+            [
+                batch["normed_voltage"],
+                batch["normed_max_cell_voltage"],
+                batch["normed_min_cell_voltage"],
+            ],
+            dim=-1,
+        )
         fake_prediction = model_dis(fake_data)
         real_prediction = model_dis(real_data)
 
@@ -92,7 +99,14 @@ class TrainEngine(BaseTrainEngine):
                 batch = {key: value.to(torch.device("cuda" if torch.cuda.is_available() else "cpu")) for key, value in batch.items()}
                 with torch.no_grad():
                     outputs = model(batch)
-                    target = batch["normed_voltage"].unsqueeze(-1)  # B x L x 1
+                    target = torch.stack(
+                        [
+                            batch["normed_voltage"],
+                            batch["normed_max_cell_voltage"],
+                            batch["normed_min_cell_voltage"],
+                        ],
+                        dim=-1,
+                    )
                     scores_rec = self.criterion_mse_eval(outputs["logits_rec"], target).mean(dim=[1, 2]).detach().cpu().tolist()
 
                 for car_id, label, score_rec in zip(car_ids, labels, scores_rec):

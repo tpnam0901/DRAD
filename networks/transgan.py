@@ -160,7 +160,7 @@ class TransGAN(nn.Module):
     def __init__(self, cfg: Config):
         super(TransGAN, self).__init__()
 
-        self.projection = nn.Linear(3, cfg.transgan_input_embedding_dimension)
+        self.projection = nn.Linear(4, cfg.transgan_input_embedding_dimension)
         self.pe = PositionalEncoding(d_model=cfg.transgan_input_embedding_dimension, dropout=cfg.transgan_dropout_pe)
 
         self.encoder = nn.Sequential(
@@ -186,22 +186,24 @@ class TransGAN(nn.Module):
         )
 
         self.hidden = nn.Linear(cfg.transgan_input_embedding_dimension, cfg.transgan_hidden_layers)
-        self.linear = nn.Linear(cfg.transgan_hidden_layers, 1)
+        self.linear = nn.Linear(cfg.transgan_hidden_layers, 3)
 
     def create_time_series_data(self, inputs: Dict[str, torch.Tensor]):
         """
         Create time series data from the raw data.
         :param inputs: Dictionary containing raw data tensors
         """
-        normed_voltage = inputs["normed_voltage"]
         normed_current = inputs["normed_current"]
         normed_soc = inputs["normed_soc"]
+        normed_min_cell_temperature = inputs["normed_min_cell_temperature"]
+        normed_max_cell_temperature = inputs["normed_max_cell_temperature"]
 
         time_series_data = torch.stack(
             [
-                normed_voltage,
-                normed_current,
                 normed_soc,
+                normed_current,
+                normed_min_cell_temperature,
+                normed_max_cell_temperature,
             ],
             dim=-1,
         )  # B x L x H_in
@@ -235,7 +237,7 @@ class TransGAN(nn.Module):
 class Discriminator(TransGAN):
     def __init__(self, cfg: Config):
         super(Discriminator, self).__init__(cfg)
-        self.projection = nn.Linear(1, cfg.transgan_input_embedding_dimension)
+        self.projection = nn.Linear(3, cfg.transgan_input_embedding_dimension)
         self.linear = nn.Linear(cfg.transgan_hidden_layers, 1)
 
     def forward(self, inputs):
