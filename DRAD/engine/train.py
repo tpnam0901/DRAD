@@ -1,19 +1,20 @@
+import glob
 import os.path as osp
 from typing import Dict, List, Tuple, Union
 
 import mlflow
+import networks
 import numpy as np
 import pandas as pd
 import torch
-from torch.optim import SGD
-from tqdm.auto import tqdm
-
-import networks
 from configs.base import Config
 from data.naobop_dataset import TrainNaoBopDataset
-from engine.base import BaseEngine
+from torch.optim import SGD
+from tqdm.auto import tqdm
 from utils.dataloader import get_dataloader
 from utils.schedulers import CosineAnnealingLR
+
+from engine.base import BaseEngine
 
 
 class TrainEngine(BaseEngine):
@@ -169,9 +170,13 @@ class TrainEngine(BaseEngine):
     def run(self):
         """Run the training process."""
 
-        car_info = pd.read_csv("/home/phuongnam/DistributedEVTest/data/battery_data/battery_brand3/label/all_label.csv")
-        # car_info = pd.read_csv("/home/phuongnam/DistributedEVTest/data/battery_data/battery_brand2/fold_label.csv")
-        car_ids = car_info["car"].unique().tolist()
+        if self.cfg.brand == "brand3":
+            car_info = pd.read_csv(osp.join(self.cfg.data_root, "label", "all_label.csv"))
+            car_ids = car_info["car"].unique().tolist()
+        else:
+            files = glob.glob(osp.join(self.cfg.data_root, "data_by_segments", "*"))
+            car_ids = list(set([int(osp.basename(f).split("_")[0]) for f in files]))
+        print(car_ids)
 
         for idx, car_id in enumerate(car_ids):
             datasets = self.load_dataset(

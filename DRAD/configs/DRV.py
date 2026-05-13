@@ -8,7 +8,7 @@ class Config(BaseConfig):
         super(Config, self).__init__()
 
         # Modify default parameters
-        self.name = f"DRV_{self.brand}"
+        self.name = "DRV_{}_{}".format(self.brand, self.fold_num)
 
         self.model_type: str = "DRV"
 
