@@ -83,31 +83,40 @@ print(f"Normal cars: {len(normal_car)}, Abnormal cars: {len(abnormal_car)}")
 print(f"Normal lengths: mean={np.mean(normal_lengths)}, std={np.std(normal_lengths)}")
 print(f"Abnormal lengths: mean={np.mean(abnormal_lengths)}, std={np.std(abnormal_lengths)}")
 
+# Five-fold cross validation split
 normal_car = list(normal_car)
 abnormal_car = list(abnormal_car)
+# For each fold, we use 20% of normal segments and 20% of abnormal segments in each car for testing. The rest is for training.
+num_folds = 5
 all_cars = normal_car + abnormal_car
-with open("battery_data/battery_brand1/fold_0_train.txt", "w") as train_file, open(
-    "battery_data/battery_brand1/fold_0_val.txt", "w"
-) as test_file, open("battery_data/battery_brand1/fold_label.csv", "w") as csv_file:
-    writer = csv.writer(csv_file)
-    writer.writerow(["car", "label"])
-    for car_id in all_cars:
-        car_segments = glob.glob(f"{out_dir}/{car_id}_*.pkl")
-        assert len(car_segments) > 0
-        num_segments = len(car_segments)
-        car_segments = sorted(car_segments)
-        if num_segments < 5:
-            print(f"Car {car_id} has only {num_segments} segments, skipping.")
-            continue
-        else:
-            print(f"Car {car_id} has {num_segments} segments.")
 
-        car_label = all_label[all_label["car"] == car_id]["label"].values[0]
-        writer.writerow([car_id, car_label])
+print("Starting cross-validation split...")
+for fold in range(num_folds):
+    fold_ratio_start = fold * 1 / num_folds
+    fold_ratio_end = (fold + 1) * 1 / num_folds
+    with open(f"battery_data/battery_brand1/fold_{fold}_train.txt", "w") as train_file, open(
+        f"battery_data/battery_brand1/fold_{fold}_val.txt", "w"
+    ) as test_file:
+        for car_id in all_cars:
+            car_segments = glob.glob(f"{out_dir}/{car_id}_*.pkl")
+            assert len(car_segments) > 0
+            num_segments = len(car_segments)
+            car_segments = sorted(car_segments)
+            if num_segments < 10:
+                print(f"Car {car_id} has only {num_segments} segments, skipping.")
+                continue
+            val_start_idx = math.floor(fold_ratio_start * num_segments)
+            val_end_idx = math.ceil(fold_ratio_end * num_segments)
+            val_segments = car_segments[val_start_idx:val_end_idx]
+            train_segments = car_segments[:val_start_idx] + car_segments[val_end_idx:]
+            assert len(val_segments) + len(train_segments) == num_segments
+            assert len(set(val_segments).intersection(set(train_segments))) <= 1
+            assert len(val_segments) > 0
+            assert len(train_segments) > 0
+            assert len(train_segments) > len(val_segments)
+            for seg in train_segments:
+                train_file.write(f"{osp.basename(seg)}\n")
+            for seg in val_segments:
+                test_file.write(f"{osp.basename(seg)}\n")
+print("Cross-validation split done.")
 
-        val_segments = car_segments
-        train_segments = car_segments + car_segments
-        for seg in train_segments:
-            train_file.write(f"{osp.basename(seg)}\n")
-        for seg in val_segments:
-            test_file.write(f"{osp.basename(seg)}\n")
