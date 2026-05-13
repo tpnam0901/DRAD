@@ -22,6 +22,6 @@ class EvaluateEngine(BaseEvaluateEngine):
         # self.logger.info(f"Loaded checkpoint from {ckpt_path}")
 
     def get_groups(self, cars_normal, cars_abnormal):
-        selected_groups, selected_gt = self.select_groups(cars_normal, cars_abnormal, seed=0)
+        selected_groups, selected_gt = self.select_groups(cars_normal, cars_abnormal, seed=self.cfg.seed)
 
         return selected_groups, selected_gt
