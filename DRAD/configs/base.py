@@ -82,15 +82,14 @@ class Config(BaseConfig):
         # --------------------------------------------------
 
         # --------------------------------- Data settings
-        self.brand: str = "brand3"
+        self.brand: str = "brand2"
         self.data_root: str = f"data/battery_data/battery_{self.brand}"
         self.fold_num: int = 0
         self.max_length: int = 128
         self.overlap: float = 0.0
 
         # General settings
-        # self.seed: int = np.random.randint(0, 10000)
-        self.seed: int = 42
+        self.seed: int = 2025
         self.ckpt_dir: str = "checkpoints"
         self.current_time: str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         self.keep_only_latest: bool = True
