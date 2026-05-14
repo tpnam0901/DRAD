@@ -8,7 +8,6 @@ import random
 
 import numpy as np
 import torch
-
 from configs.base import Config, import_config
 
 
@@ -76,6 +75,12 @@ if __name__ == "__main__":
         elif cfg.model_type == "CNN":
             from engine.eval_cnn import EvaluateEngine
             from engine.train_cnn import TrainEngine
+        elif cfg.model_type == "GRU":
+            from engine.eval_gru import EvaluateEngine
+            from engine.train_gru import TrainEngine
+        elif cfg.model_type == "TransGAN":
+            from engine.eval_transgan import EvaluateEngine
+            from engine.train_transgan import TrainEngine
         else:
             raise NotImplementedError(f"Model type {cfg.model_type} not implemented for CL mode.")
     elif args.mode == "DRV":
@@ -89,6 +94,10 @@ if __name__ == "__main__":
             from engine.eval_drv_lstm import EvaluateEngine
         elif cfg.model_type == "CNN":
             from engine.eval_drv_cnn import EvaluateEngine
+        elif cfg.model_type == "TransGAN":
+            from engine.eval_drv_transgan import EvaluateEngine
+        elif cfg.model_type == "GRU":
+            from engine.eval_drv_gru import EvaluateEngine
         else:
             raise NotImplementedError(f"Model type {cfg.model_type} not implemented for DRV mode.")
     else:
