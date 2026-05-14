@@ -5,15 +5,14 @@ from typing import Dict
 
 import numpy as np
 import pandas as pd
+from configs.base import Config
+from data.dataset import build_dataset
 from sklearn import metrics
 from sklearn.decomposition import PCA
 from sklearn.ensemble import IsolationForest
 from sklearn.neighbors import KNeighborsClassifier
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
-
-from configs.base import Config
-from data.dataset import build_dataset
 
 
 class TrainEngine(object):
@@ -168,7 +167,7 @@ class TrainEngine(object):
         self.logger.info("---------------- Starting PCA-based anomaly detection on test data ---------------")
         x_test_pca = x_test[:, 2:]  # Remove SOC, current.
         self.logger.info(f"Test data shape change from {x_test.shape} to {x_test_pca.shape} after removing SOC and current.")
-        pca = PCA(n_components=2, random_state=42)
+        pca = PCA(n_components=2, random_state=self.cfg.seed)
         x_test_reconstructed = pca.inverse_transform(pca.fit_transform(x_test_pca))
         residual = np.linalg.norm(x_test_pca - x_test_reconstructed, axis=1)
 
@@ -221,7 +220,7 @@ class TrainEngine(object):
             self.logger.info(f"Test {key}: {value:.4f}")
 
         self.logger.info("---------------- Starting Isolation Forest-based anomaly detection on test data ---------------")
-        isolation_forest = IsolationForest(random_state=42)
+        isolation_forest = IsolationForest(random_state=self.cfg.seed)
         isolation_forest.fit(x_train)
         anomalies = isolation_forest.predict(x_test) == -1
         self.logger.info(

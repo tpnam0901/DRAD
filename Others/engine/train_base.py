@@ -1,3 +1,4 @@
+import glob
 import logging
 import os
 import os.path as osp
@@ -5,17 +6,16 @@ from typing import Dict
 
 import matplotlib.pyplot as plt
 import mlflow
+import networks
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch
+from configs.base import Config
 from data.dataset import build_dataset
 from sklearn import metrics
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
-
-import networks
-from configs.base import Config
 from utils import optimizers, schedulers
 
 plt.rcParams["font.family"] = "Times New Roman"
@@ -249,7 +249,7 @@ class TrainEngine(object):
                 for batch in dataloader:
                     self.global_step += 1
                     loss_dict, metric_dict = self.train_step(model, batch, optimizer)
-                    postfix = "Epoch {}/{} - ".format(self.global_step // len(dataloader) + 1, self.cfg.num_epochs)
+                    postfix = "Epoch {}/{} - ".format(self.global_step // len(dataloader), self.cfg.num_epochs)
                     postfix += "Total Loss: {:.8f} - ".format(loss_dict["total_loss"].item())
                     postfix += "F1: {:.2f} - ".format(metric_dict["f1"])
                     pbar.set_description(postfix)
@@ -311,9 +311,21 @@ class TrainEngine(object):
         return metric_dict, (car_labels, car_avg_scores_cls, car_avg_scores_rec)
 
     def load_data(self):
-        car_info = pd.read_csv("/home/phuongnam/DistributedEVTest/data/battery_data/battery_brand3/label/all_label.csv")
+        if self.cfg.brand_num == 3:
+            car_info = pd.read_csv(osp.join(self.cfg.data_root, "battery_brand3", "label", "all_label.csv"))
+            car_available_ids = car_info["car"].unique().tolist()
+        else:
+            files = glob.glob(osp.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "data_by_segments", "*"))
+            car_available_ids = list(set([int(osp.basename(f).split("_")[0]) for f in files]))
+            car_info1 = pd.read_csv(osp.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "label", "train_label.csv"))
+            car_info2 = pd.read_csv(osp.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "label", "test_label.csv"))
+            car_info = pd.concat([car_info1, car_info2], ignore_index=True)
+
         car_normal_ids = car_info[car_info["label"] == 0]["car"].unique().tolist()
         car_abnormal_ids = car_info[car_info["label"] == 1]["car"].unique().tolist()
+
+        car_normal_ids = [car_id for car_id in car_normal_ids if car_id in car_available_ids]
+        car_abnormal_ids = [car_id for car_id in car_abnormal_ids if car_id in car_available_ids]
 
         train_dataset = self.load_train_dataset(car_normal_ids)
         min_mileage, max_mileage = train_dataset.get_min_max_mileage()
@@ -347,17 +359,18 @@ class TrainEngine(object):
 
             with mlflow.start_run(run_name=self.mlflow_run_name, run_id=self.mlflow_id):
                 mlflow.log_metric("learning_rate", scheduler.get_last_lr()[0], step=self.global_step)
-                metric_dict, _ = self.evaluate(model, test_dataset)
-                for key, value in metric_dict.items():
-                    self.logger.info(f"Test {key}: {value:.4f}")
-                    mlflow.log_metric("test_{}".format(key), value, step=self.global_step)
-                if metric_dict["cls_f1"] > best_f1_cls:
-                    best_f1_cls = metric_dict["cls_f1"]
-                    self.logger.info(f"New best F1 score for classification: {best_f1_cls:.4f}. Saving checkpoint.")
-                    self.save_checkpoint(model, prefix="best_cls")
-                if metric_dict["rec_f1"] > best_f1_rec:
-                    best_f1_rec = metric_dict["rec_f1"]
-                    self.logger.info(f"New best F1 score for reconstruction: {best_f1_rec:.4f}. Saving checkpoint.")
-                    self.save_checkpoint(model, prefix="best_rec")
+                if epoch < 5 or epoch % 10 == 0:
+                    metric_dict, _ = self.evaluate(model, test_dataset)
+                    for key, value in metric_dict.items():
+                        self.logger.info(f"Test {key}: {value:.4f}")
+                        mlflow.log_metric("test_{}".format(key), value, step=self.global_step)
+                    if metric_dict["cls_f1"] >= best_f1_cls:
+                        best_f1_cls = metric_dict["cls_f1"]
+                        self.logger.info(f"New best F1 score for classification: {best_f1_cls:.4f}. Saving checkpoint.")
+                        self.save_checkpoint(model, prefix="best_cls")
+                    if metric_dict["rec_f1"] >= best_f1_rec:
+                        best_f1_rec = metric_dict["rec_f1"]
+                        self.logger.info(f"New best F1 score for reconstruction: {best_f1_rec:.4f}. Saving checkpoint.")
+                        self.save_checkpoint(model, prefix="best_rec")
 
         self.logger.info("Training completed.")

@@ -5,16 +5,15 @@ import random
 from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
+import networks
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch
+from configs.base import Config
+from data.dataset import build_dataset
 from sklearn import metrics
 from tqdm.auto import tqdm
-
-import networks
-from configs.DRV import Config
-from data.dataset import build_dataset
 
 
 class EvaluateEngine(object):
@@ -311,13 +310,6 @@ class EvaluateEngine(object):
     def eval_group(self, group: List[int]) -> Dict:
         all_datasets = {}
         for car_id in group:
-            if car_id < 201:
-                brand_num = 1
-            elif car_id < 401:
-                brand_num = 2
-            else:
-                brand_num = 3
-
             train_dataset = build_dataset(
                 self.cfg.data_root,
                 brand_num=self.cfg.brand_num,
@@ -370,23 +362,23 @@ class EvaluateEngine(object):
     def build_car_groups(self, num_normal=-1, num_abnormal=1, seed=42) -> List[List[int]]:
         car_normal_ids = []
         cars_abnormal_ids = []
-        if self.cfg.brand_num == 3:
-            meta_data = pd.read_csv(osp.join(self.cfg.data_root, "battery_brand3", "label", "all_label.csv"))
-            # Get unique car ids from meta data
-            car_normal_ids = meta_data[meta_data["label"] == 0]["car"].unique().tolist()
-            cars_abnormal_ids = meta_data[meta_data["label"] == 1]["car"].unique().tolist()
-        else:
-            meta_train = pd.read_csv(os.path.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "label", "train_label.csv"))
-            meta_test = pd.read_csv(os.path.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "label", "test_label.csv"))
-            car_normal_ids = (
-                meta_train[meta_train["label"] == 0]["car"].unique().tolist() + meta_test[meta_test["label"] == 0]["car"].unique().tolist()
-            )
-            cars_abnormal_ids = (
-                meta_train[meta_train["label"] == 1]["car"].unique().tolist() + meta_test[meta_test["label"] == 1]["car"].unique().tolist()
-            )
 
-            # Remove car id 232 and 230 from dataset.
-            car_normal_ids = [car_id for car_id in car_normal_ids if car_id not in [232, 230]]
+        if self.cfg.brand_num == 3:
+            car_info = pd.read_csv(osp.join(self.cfg.data_root, "battery_brand3", "label", "all_label.csv"))
+            car_available_ids = car_info["car"].unique().tolist()
+        else:
+            with open(osp.join(self.cfg.data_root, f"fold_{self.cfg.fold_num}_train.txt"), "r") as f:
+                car_info = f.readlines()
+            car_available_ids = list(set([int(osp.basename(f).split("_")[0]) for f in car_info]))
+            car_info1 = pd.read_csv(osp.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "label", "train_label.csv"))
+            car_info2 = pd.read_csv(osp.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "label", "test_label.csv"))
+            car_info = pd.concat([car_info1, car_info2], ignore_index=True)
+
+        car_normal_ids = car_info[car_info["label"] == 0]["car"].unique().tolist()
+        cars_abnormal_ids = car_info[car_info["label"] == 1]["car"].unique().tolist()
+
+        car_normal_ids = [car_id for car_id in car_normal_ids if car_id in car_available_ids]
+        cars_abnormal_ids = [car_id for car_id in cars_abnormal_ids if car_id in car_available_ids]
 
         print("Normal cars:", car_normal_ids, "\nAbnormal cars:", cars_abnormal_ids)
 
@@ -408,7 +400,9 @@ class EvaluateEngine(object):
         all_group_grouping_preds = []
         all_ground_truths = []
         for group_idx, group in enumerate(selected_groups):
-            self.logger.info(f"Evaluating group {group_idx}/{len(selected_groups)}: {group}. Loading datasets for each car in the group...")
+            self.logger.info(
+                f"Evaluating group {group_idx+1}/{len(selected_groups)}: {group}. Loading datasets for each car in the group..."
+            )
             each_car_errors = self.eval_group(group)
             gt = [0] * (len(group) - num_abnormal) + [1] * num_abnormal
             all_ground_truths.extend(gt)

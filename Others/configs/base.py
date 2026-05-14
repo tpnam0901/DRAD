@@ -6,6 +6,8 @@ import os
 import sys
 from typing import Any, List, Tuple
 
+import numpy as np
+
 
 class BaseConfig(object):
     def __init__(self):
@@ -77,10 +79,9 @@ class Config(BaseConfig):
         self.description = "default"
 
         # --------------------------------- Training settings
-        self.seed: int = 2025
+        self.seed: int = np.random.randint(0, 10000)
         self.batch_size: int = 128
-        self.num_epochs: int = 1000
-        self.fold_num: int = 0
+        self.num_epochs: int = 100
         self.checkpoint_dir: str = "working/checkpoints/RFDBattery"
         self.current_time: str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         self.use_amp: bool = False
@@ -90,6 +91,7 @@ class Config(BaseConfig):
         # --------------------------------- Dataset
         self.data_root: str = "working/dataset/RFDBattery"
         self.brand_num: int = 3
+        self.fold_num: int = 0
         self.num_workers: int = 8
         self.alpha: float = 2.0
 

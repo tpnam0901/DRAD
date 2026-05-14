@@ -6,7 +6,7 @@ class Config(BaseConfig):
         super(Config, self).__init__()
 
         self.model_type = "AE"
-        self.name = "AE_cl_brand{}".format(self.brand_num)
+        self.name = "AE_{}_{}".format(self.brand_num, self.seed)
 
         self.unlock()
         # Add more configuration parameters as needed

@@ -6,7 +6,7 @@ class Config(BaseConfig):
         super(Config, self).__init__()
 
         self.model_type = "DyAD"
-        self.name = "DyAD_cl_brand{}".format(self.brand_num)
+        self.name = "DyAD_{}_{}".format(self.brand_num, self.seed)
 
         if self.model_type == "DyAD":
             self.batch_size = 128

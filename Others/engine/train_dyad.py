@@ -3,9 +3,8 @@ from typing import Dict
 import mlflow
 import numpy as np
 import torch
-from tqdm.auto import tqdm
-
 from configs.DyAD import Config
+from tqdm.auto import tqdm
 
 from .train_base import TrainEngine as BaseTrainEngine
 
@@ -129,15 +128,16 @@ class TrainEngine(BaseTrainEngine):
             self.train_epoch(model, train_dataloader, optimizer, scheduler)
             self.save_checkpoint(model, prefix=f"latest")
 
-            with mlflow.start_run(run_name=self.mlflow_run_name, run_id=self.mlflow_id):
-                mlflow.log_metric("learning_rate", scheduler.get_last_lr()[0], step=self.global_step)
-                metric_dict, _ = self.evaluate(model, test_dataset)
-                for key, value in metric_dict.items():
-                    self.logger.info(f"Test {key}: {value:.4f}")
-                    mlflow.log_metric("test_{}".format(key), value, step=self.global_step)
-                if metric_dict["rec_f1"] > best_f1_rec:
-                    best_f1_rec = metric_dict["rec_f1"]
-                    self.logger.info(f"New best F1 score for reconstruction: {best_f1_rec:.4f}. Saving checkpoint.")
-                    self.save_checkpoint(model, prefix="best_rec_f1")
+            if epoch < 5 or epoch % 10 == 0:
+                with mlflow.start_run(run_name=self.mlflow_run_name, run_id=self.mlflow_id):
+                    mlflow.log_metric("learning_rate", scheduler.get_last_lr()[0], step=self.global_step)
+                    metric_dict, _ = self.evaluate(model, test_dataset)
+                    for key, value in metric_dict.items():
+                        self.logger.info(f"Test {key}: {value:.4f}")
+                        mlflow.log_metric("test_{}".format(key), value, step=self.global_step)
+                    if metric_dict["rec_f1"] >= best_f1_rec:
+                        best_f1_rec = metric_dict["rec_f1"]
+                        self.logger.info(f"New best F1 score for reconstruction: {best_f1_rec:.4f}. Saving checkpoint.")
+                        self.save_checkpoint(model, prefix="best_rec_f1")
 
         self.logger.info("Training completed.")

@@ -6,7 +6,7 @@ class Config(BaseConfig):
         super(Config, self).__init__()
 
         self.model_type = "CNN"
-        self.name = "CNN_cl_brand{}".format(self.brand_num)
+        self.name = "CNN_{}_{}".format(self.brand_num, self.seed)
 
         self.unlock()
         # Add more configuration parameters as needed
