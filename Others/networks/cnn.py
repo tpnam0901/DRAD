@@ -5,7 +5,7 @@ import torch.nn as nn
 class CNN(nn.Module):
     def __init__(self, cfg):
         super(CNN, self).__init__()
-        self.conv1d = nn.Conv1d(4, 32, kernel_size=3, stride=1, padding=1)
+        self.conv1d = nn.Conv1d(7, 32, kernel_size=3, stride=1, padding=1)
         self.maxpool = nn.MaxPool1d(kernel_size=7, stride=1, padding=3)
         self.selu = nn.SELU()
 
@@ -20,7 +20,7 @@ class CNN(nn.Module):
 
         # -------- Output layers
         # Volt, current, soc, max_single_volt, min_single_volt, max_temp, min_temp
-        self.regression = nn.Linear(90 * 2, 3)
+        self.regression = nn.Linear(90 * 2, 5)
         # Mileage
         self.regression_mileage = nn.Sequential(
             nn.Linear(128 * 90 * 2, 512),
@@ -30,19 +30,19 @@ class CNN(nn.Module):
 
     def forward(self, inputs):
         # Swap b,l,c to b,c,l for Conv1d
-        normed_time_series = torch.stack(
-            [
-                inputs["normed_soc"],
-                inputs["normed_current"],
-                inputs["normed_min_cell_temperature"],
-                inputs["normed_max_cell_temperature"],
-                # inputs["normed_voltage"],
-                # inputs["normed_max_cell_voltage"],
-                # inputs["normed_min_cell_voltage"],
-            ],
-            dim=-1,
-        )
-
+        # normed_time_series = torch.stack(
+        #     [
+        #         inputs["normed_soc"],
+        #         inputs["normed_current"],
+        #         inputs["normed_min_cell_temperature"],
+        #         inputs["normed_max_cell_temperature"],
+        #         # inputs["normed_voltage"],
+        #         # inputs["normed_max_cell_voltage"],
+        #         # inputs["normed_min_cell_voltage"],
+        #     ],
+        #     dim=-1,
+        # )
+        normed_time_series = inputs["normed_time_series"]
         x = normed_time_series.permute(0, 2, 1)
         x = self.conv1d(x)
         x = self.maxpool(x)

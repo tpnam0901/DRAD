@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-
 from configs.AE import Config
 
 
@@ -31,30 +30,31 @@ class AE(nn.Module):
         self.l2_dec_bn = nn.BatchNorm1d(256)
         self.l3_dec = nn.Linear(256, 1024)
         self.l3_dec_bn = nn.BatchNorm1d(1024)
-        self.l4_dec = nn.Linear(1024, 3 * 128)
-        self.l4_dec_bn = nn.BatchNorm1d(3 * 128)
+        self.l4_dec = nn.Linear(1024, 5 * 128)
+        self.l4_dec_bn = nn.BatchNorm1d(5 * 128)
 
         # -------- Output layers
         # Mileage
         self.regression_mileage = nn.Sequential(
-            nn.Linear(3 * 128, 512),
+            nn.Linear(5 * 128, 512),
             nn.ReLU(),
             nn.Linear(512, 1),
         )
 
     def forward(self, inputs):
-        normed_time_series = torch.stack(
-            [
-                inputs["normed_soc"],
-                inputs["normed_current"],
-                inputs["normed_min_cell_temperature"],
-                inputs["normed_max_cell_temperature"],
-                # inputs["normed_voltage"],
-                # inputs["normed_max_cell_voltage"],
-                # inputs["normed_min_cell_voltage"],
-            ],
-            dim=-1,
-        )
+        # normed_time_series = torch.stack(
+        #     [
+        #         inputs["normed_soc"],
+        #         inputs["normed_current"],
+        #         inputs["normed_min_cell_temperature"],
+        #         inputs["normed_max_cell_temperature"],
+        #         # inputs["normed_voltage"],
+        #         # inputs["normed_max_cell_voltage"],
+        #         # inputs["normed_min_cell_voltage"],
+        #     ],
+        #     dim=-1,
+        # )
+        normed_time_series = inputs["normed_time_series"]  # B x L x 7
         x = normed_time_series
         x = self.projection(x)  # B x L x H_fusion
         x = self.flatten(x)  # B x (L * H_fusion)
@@ -79,7 +79,7 @@ class AE(nn.Module):
         x = self.l4_dec(x)
         x = self.l4_dec_bn(x)
 
-        logits_reconstruction = x.view(-1, 128, 3)  # B x L x H_fusion
+        logits_reconstruction = x.view(-1, 128, 5)  # B x L x H_fusion
 
         # Mileage regression
         logits_mileage = self.regression_mileage(x)  # B x 1

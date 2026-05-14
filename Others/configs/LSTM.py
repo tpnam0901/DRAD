@@ -12,7 +12,7 @@ class Config(BaseConfig):
         self.unlock()
         # Add more configuration parameters as needed
 
-        self.rnn_input_size: int = 4  # Hidden size for rnn layers
+        self.rnn_input_size: int = 7  # Hidden size for rnn layers
         self.rnn_num_layers: int = 3  # Number of rnn layers
         self.rnn_bidirectional: bool = True  # Whether to use bidirectional rnn
 
