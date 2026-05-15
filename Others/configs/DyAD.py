@@ -4,7 +4,8 @@ from configs.base import Config as BaseConfig
 class Config(BaseConfig):
     def __init__(self):
         super(Config, self).__init__()
-
+        # Seed used in the paper: 13, 3894, 4426, 5590, 5748
+        self.seed = 13
         self.model_type = "DyAD"
         self.name = "DyAD_{}_{}".format(self.brand_num, self.seed)
 
