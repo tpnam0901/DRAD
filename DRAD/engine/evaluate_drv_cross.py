@@ -5,14 +5,14 @@ import random
 from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
+import networks
 import numpy as np
 import pandas as pd
 import torch
-from tqdm.auto import tqdm
-
-import networks
 from configs.base import Config
 from data.naobop_dataset import EvalNaoBopDataset
+from tqdm.auto import tqdm
+
 from engine.evaluate_drv import EvaluateEngine as BaseEvaluateEngine
 
 plt.rcParams["font.family"] = "Times New Roman"
@@ -250,7 +250,7 @@ class EvaluateEngine(BaseEvaluateEngine):
 
         return selected_groups, selected_gt
 
-    def get_groups(self, cars_normal_g1, cars_normal_g2, cars_abnormal):
+    def get_groups(self, cars_normal_g1, cars_normal_g2, cars_abnormal, seed=42):
 
         group_size = 11
         max_abnormal = 1
@@ -261,6 +261,7 @@ class EvaluateEngine(BaseEvaluateEngine):
             cars_abnormal,
             group_size=group_size,
             max_abnormal=max_abnormal,
+            seed=seed,
         )
 
         return selected_groups, selected_gt
@@ -297,7 +298,7 @@ class EvaluateEngine(BaseEvaluateEngine):
 
         print("Normal cars:", cars_normal_g1, "\nNormal cars:", cars_normal_g2, "\nAbnormal cars:", cars_abnormal)
 
-        selected_groups, selected_gt = self.get_groups(cars_normal_g1, cars_normal_g2, cars_abnormal)
+        selected_groups, selected_gt = self.get_groups(cars_normal_g1, cars_normal_g2, cars_abnormal, seed=2025)
 
         metrics = {"mean_std": {}, "iqr": {}, "grouping": {}}
         all_group_errors = []

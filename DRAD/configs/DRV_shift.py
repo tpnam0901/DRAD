@@ -8,7 +8,7 @@ class Config(BaseConfig):
         super(Config, self).__init__()
 
         # Modify default parameters
-        self.name = f"DRVShift_{self.brand}"
+        self.name = "DRVShift_{}_{}".format(self.brand, self.seed)
 
         self.model_type: str = "DRVShift"
 

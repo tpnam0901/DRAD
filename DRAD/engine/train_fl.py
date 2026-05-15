@@ -1,15 +1,16 @@
+import glob
 import os.path as osp
 from typing import Dict
 
 import pandas as pd
 import torch
+from data.naobop_dataset import TrainNaoBopDataset
 from torch.optim import SGD
 from tqdm.auto import tqdm
-
-from data.naobop_dataset import TrainNaoBopDataset
-from engine.train_drv import TrainEngine as BaseEngine
 from utils.dataloader import get_dataloader
 from utils.schedulers import CosineAnnealingLR
+
+from engine.train_drv import TrainEngine as BaseEngine
 
 
 class TrainEngine(BaseEngine):
@@ -70,8 +71,18 @@ class TrainEngine(BaseEngine):
     def run(self):
         """Run the training process."""
 
-        car_info = pd.read_csv("/home/phuongnam/DistributedEVTest/data/battery_data/battery_brand3/label/all_label.csv")
+        if self.cfg.brand == "brand3":
+            car_info = pd.read_csv(osp.join(self.cfg.data_root, "label", "all_label.csv"))
+            car_available_ids = car_info["car"].unique().tolist()
+        else:
+            with open(osp.join(self.cfg.data_root, f"fold_{self.cfg.fold_num}_train.txt"), "r") as f:
+                car_info = f.readlines()
+            car_available_ids = list(set([int(osp.basename(f).split("_")[0]) for f in car_info]))
+            car_info1 = pd.read_csv(osp.join(self.cfg.data_root, "label", "train_label.csv"))
+            car_info2 = pd.read_csv(osp.join(self.cfg.data_root, "label", "test_label.csv"))
+            car_info = pd.concat([car_info1, car_info2], ignore_index=True)
         car_normal_ids = car_info[car_info["label"] == 0]["car"].unique().tolist()
+        car_normal_ids = [car_id for car_id in car_normal_ids if car_id in car_available_ids]
 
         model = self.build_model()
         global_ckpt = self.save_checkpoint(model, 0, keep_only_latest=False, prefix="global_")
@@ -97,12 +108,18 @@ class TrainEngine(BaseEngine):
                     model = self.build_model()
                     model.load_state_dict(torch.load(global_ckpt))
                     optimizer = SGD(model.parameters(), lr=self.cfg.learning_rate, momentum=0.99, weight_decay=1e-4)
-                    ckpt_path = self.save_checkpoint(model, 0, keep_only_latest=True, prefix=f"car_{car_id}_")
+                    try:
+                        ckpt_path = self.save_checkpoint(model, 0, keep_only_latest=True, prefix=f"car_{car_id}_")
+                    except Exception as e:
+                        self.logger.error(f"Error occurred while saving checkpoint for car {car_id}: {e}")
                     local_loss = 0.0
                     for epoch in range(5):
                         loss_epoch = self.train_epoch(model, train_loader, optimizer, scheduler, prefix=f"car_{car_id}_")
                         local_loss += loss_epoch
-                        ckpt_path = self.save_checkpoint(model, epoch + 1, keep_only_latest=True, prefix=f"car_{car_id}_")
+                        try:
+                            ckpt_path = self.save_checkpoint(model, epoch + 1, keep_only_latest=True, prefix=f"car_{car_id}_")
+                        except Exception as e:
+                            self.logger.error(f"Error occurred while saving checkpoint for car {car_id}: {e}")
                     local_loss /= 5
                     total_loss += local_loss
                     pbar.set_description(f"Car {car_id} - Loss: {local_loss:.4f}")
@@ -128,7 +145,10 @@ class TrainEngine(BaseEngine):
 
             # Load the aggregated state dict into the model and save as the new global checkpoint
             model.load_state_dict(global_state_dict)
-            global_ckpt = self.save_checkpoint(model, round + 1, keep_only_latest=False, prefix="global_")
+            try:
+                global_ckpt = self.save_checkpoint(model, round + 1, keep_only_latest=False, prefix="global_")
+            except Exception as e:
+                self.logger.error(f"Error occurred while saving global checkpoint for round {round + 1}: {e}")
             scheduler.step()
             self.cfg.learning_rate = scheduler.get_last_lr()[0]
         self.logger.info("Training completed.")

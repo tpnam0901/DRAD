@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
+from configs.base import Config
+from data.naobop_dataset import EvalNaoBopDataset
 from sklearn.metrics import (
     accuracy_score,
     f1_score,
@@ -16,8 +18,6 @@ from sklearn.metrics import (
 )
 from tqdm.auto import tqdm
 
-from configs.base import Config
-from data.naobop_dataset import EvalNaoBopDataset
 from engine.train import TrainEngine
 
 plt.rcParams["font.family"] = "Times New Roman"
@@ -306,11 +306,11 @@ class EvaluateEngine(TrainEngine):
         normals_per_group = group_size - max_abnormal
         num_groups = math.ceil(len(cars_abnormal) / max_abnormal)
 
+        random.shuffle(cars_normal)
         random.shuffle(cars_abnormal)
         # Repeat normal cars if not enough to fill all groups
         if len(cars_normal) < num_groups * normals_per_group:
             cars_normal = cars_normal * (math.ceil((num_groups * normals_per_group) / len(cars_normal)))
-        random.shuffle(cars_normal)
 
         for i in range(num_groups):
             selected_normals = cars_normal[i * normals_per_group : (i + 1) * normals_per_group]
@@ -322,12 +322,12 @@ class EvaluateEngine(TrainEngine):
         return selected_groups, selected_gt
 
     def get_groups(self, cars_normal, cars_abnormal):
-        # selected_groups, selected_gt = self.select_groups(cars_normal, cars_abnormal, seed=self.cfg.seed)
+        # selected_groups, selected_gt = self.select_groups(cars_normal, cars_abnormal, seed=2025)
 
         group_size = 11
         max_abnormal = 1
         selected_groups, selected_gt = self.select_random_groups(
-            cars_normal, cars_abnormal, group_size=group_size, max_abnormal=max_abnormal, seed=self.cfg.seed
+            cars_normal, cars_abnormal, group_size=group_size, max_abnormal=max_abnormal, seed=2025
         )
 
         return selected_groups, selected_gt
@@ -336,9 +336,22 @@ class EvaluateEngine(TrainEngine):
         """Run the training process."""
         print("Starting evaluation on {} dataset, fold {}".format(self.cfg.data_root, self.cfg.fold_num))
 
-        all_car = pd.read_csv(osp.join(self.cfg.data_root, "label", "all_label.csv"))
-        cars_normal = all_car[all_car["label"] == 0]["car"].unique().tolist()
-        cars_abnormal = all_car[all_car["label"] == 1]["car"].unique().tolist()
+        if self.cfg.brand == "brand3":
+            car_info = pd.read_csv(osp.join(self.cfg.data_root, "label", "all_label.csv"))
+            car_available_ids = car_info["car"].unique().tolist()
+        else:
+            with open(osp.join(self.cfg.data_root, f"fold_{self.cfg.fold_num}_train.txt"), "r") as f:
+                car_info = f.readlines()
+            car_available_ids = list(set([int(osp.basename(f).split("_")[0]) for f in car_info]))
+            car_info1 = pd.read_csv(osp.join(self.cfg.data_root, "label", "train_label.csv"))
+            car_info2 = pd.read_csv(osp.join(self.cfg.data_root, "label", "test_label.csv"))
+            car_info = pd.concat([car_info1, car_info2], ignore_index=True)
+
+        cars_normal = car_info[car_info["label"] == 0]["car"].unique().tolist()
+        cars_abnormal = car_info[car_info["label"] == 1]["car"].unique().tolist()
+
+        cars_normal = [car_id for car_id in cars_normal if car_id in car_available_ids]
+        cars_abnormal = [car_id for car_id in cars_abnormal if car_id in car_available_ids]
 
         print("Normal cars:", cars_normal, "\nAbnormal cars:", cars_abnormal)
 

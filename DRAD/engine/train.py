@@ -174,9 +174,10 @@ class TrainEngine(BaseEngine):
             car_info = pd.read_csv(osp.join(self.cfg.data_root, "label", "all_label.csv"))
             car_ids = car_info["car"].unique().tolist()
         else:
-            files = glob.glob(osp.join(self.cfg.data_root, "data_by_segments", "*"))
-            car_ids = list(set([int(osp.basename(f).split("_")[0]) for f in files]))
-        print(car_ids)
+            with open(osp.join(self.cfg.data_root, f"fold_{self.cfg.fold_num}_train.txt"), "r") as f:
+                car_info = f.readlines()
+            car_ids = list(set([int(osp.basename(f).split("_")[0]) for f in car_info]))
+        
 
         for idx, car_id in enumerate(car_ids):
             datasets = self.load_dataset(
