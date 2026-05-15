@@ -1,3 +1,4 @@
+import glob
 import logging
 import os
 import os.path as osp
@@ -94,9 +95,21 @@ class TrainEngine(object):
         return metric_dict
 
     def load_data(self):
-        car_info = pd.read_csv("/home/phuongnam/DistributedEVTest/data/battery_data/battery_brand3/label/all_label.csv")
+        if self.cfg.brand_num == 3:
+            car_info = pd.read_csv(osp.join(self.cfg.data_root, "battery_brand3", "label", "all_label.csv"))
+            car_available_ids = car_info["car"].unique().tolist()
+        else:
+            files = glob.glob(osp.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "data_by_segments", "*"))
+            car_available_ids = list(set([int(osp.basename(f).split("_")[0]) for f in files]))
+            car_info1 = pd.read_csv(osp.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "label", "train_label.csv"))
+            car_info2 = pd.read_csv(osp.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "label", "test_label.csv"))
+            car_info = pd.concat([car_info1, car_info2], ignore_index=True)
+
         car_normal_ids = car_info[car_info["label"] == 0]["car"].unique().tolist()
         car_abnormal_ids = car_info[car_info["label"] == 1]["car"].unique().tolist()
+
+        car_normal_ids = [car_id for car_id in car_normal_ids if car_id in car_available_ids]
+        car_abnormal_ids = [car_id for car_id in car_abnormal_ids if car_id in car_available_ids]
 
         train_dataset = self.load_train_dataset(car_normal_ids)
         min_mileage, max_mileage = train_dataset.get_min_max_mileage()

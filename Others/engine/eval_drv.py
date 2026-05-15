@@ -367,7 +367,7 @@ class EvaluateEngine(object):
             car_info = pd.read_csv(osp.join(self.cfg.data_root, "battery_brand3", "label", "all_label.csv"))
             car_available_ids = car_info["car"].unique().tolist()
         else:
-            with open(osp.join(self.cfg.data_root, f"fold_{self.cfg.fold_num}_train.txt"), "r") as f:
+            with open(osp.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", f"fold_{self.cfg.fold_num}_train.txt"), "r") as f:
                 car_info = f.readlines()
             car_available_ids = list(set([int(osp.basename(f).split("_")[0]) for f in car_info]))
             car_info1 = pd.read_csv(osp.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "label", "train_label.csv"))
