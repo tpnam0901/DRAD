@@ -1,10 +1,11 @@
-import torch
-import numpy as np
 import glob
 import math
-from tqdm.auto import tqdm
 import os
 import os.path as osp
+
+import numpy as np
+import torch
+from tqdm.auto import tqdm
 
 column = torch.load("battery_data/battery_brand3/column.pkl")
 data_files = glob.glob("battery_data/battery_brand3/data/*.pkl")
@@ -89,7 +90,7 @@ for fold in range(num_folds):
     fold_ratio_start = fold * 1 / num_folds
     fold_ratio_end = (fold + 1) * 1 / num_folds
     with open(f"battery_data/battery_brand3/fold_{fold}_train.txt", "w") as train_file, open(
-        f"battery_data/battery_brand3/fold_{fold}_val.txt", "w"
+        f"battery_data/battery_brand3/fold_{fold}_test.txt", "w"
     ) as test_file:
         for car_id in all_cars:
             car_segments = glob.glob(f"{out_dir}/{car_id}_*.pkl")

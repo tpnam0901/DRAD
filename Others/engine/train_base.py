@@ -79,7 +79,7 @@ class TrainEngine(object):
         return build_dataset(
             self.cfg.data_root,
             brand_num=self.cfg.brand_num,
-            mode="val",
+            mode="test",
             car_ids=car_ids,
             fold_num=self.cfg.fold_num,
         )
@@ -313,19 +313,13 @@ class TrainEngine(object):
     def load_data(self):
         if self.cfg.brand_num == 3:
             car_info = pd.read_csv(osp.join(self.cfg.data_root, "battery_brand3", "label", "all_label.csv"))
-            car_available_ids = car_info["car"].unique().tolist()
         else:
-            files = glob.glob(osp.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "data_by_segments", "*"))
-            car_available_ids = list(set([int(osp.basename(f).split("_")[0]) for f in files]))
             car_info1 = pd.read_csv(osp.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "label", "train_label.csv"))
             car_info2 = pd.read_csv(osp.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "label", "test_label.csv"))
             car_info = pd.concat([car_info1, car_info2], ignore_index=True)
 
         car_normal_ids = car_info[car_info["label"] == 0]["car"].unique().tolist()
         car_abnormal_ids = car_info[car_info["label"] == 1]["car"].unique().tolist()
-
-        car_normal_ids = [car_id for car_id in car_normal_ids if car_id in car_available_ids]
-        car_abnormal_ids = [car_id for car_id in car_abnormal_ids if car_id in car_available_ids]
 
         train_dataset = self.load_train_dataset(car_normal_ids)
         min_mileage, max_mileage = train_dataset.get_min_max_mileage()
@@ -338,6 +332,15 @@ class TrainEngine(object):
             shuffle=True,
             num_workers=self.cfg.num_workers,
         )
+
+        if self.cfg.brand_num != 3:
+            test_dataset = self.get_dataloader(
+                test_dataset,
+                batch_size=self.cfg.batch_size,
+                shuffle=False,
+                num_workers=self.cfg.num_workers,
+                drop_last=False,
+            )
         return train_dataloader, test_dataset, car_normal_ids, car_abnormal_ids
 
     def run(self):
