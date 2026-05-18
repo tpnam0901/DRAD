@@ -80,23 +80,26 @@ class TrainEngine(BaseTrainEngine):
         # For each car, calculate the average score across all its samples and use that for evaluation
         car_scores_rec = {}
         car_labels = {}
-        for samples in tqdm(dataset, ascii=True, desc="Evaluating"):
-            for batch in samples:
-                for k, v in batch.items():
-                    batch[k] = v.unsqueeze(0)
-                car_ids = batch["car"].detach().cpu().numpy().tolist()
-                labels = batch["label"].detach().cpu().numpy().tolist()
-                batch = {key: value.to(torch.device("cuda" if torch.cuda.is_available() else "cpu")) for key, value in batch.items()}
-                with torch.no_grad():
-                    outputs = model(batch)
-                    target = batch["normed_time_series"][:, :, self.cfg.dyad_decoder_embedding_size :]
-                    scores_rec = self.criterion_mse_eval(outputs["log_p"], target).mean(dim=[1, 2]).detach().cpu().tolist()
+        for batch in tqdm(dataset, ascii=True, desc="Evaluating"):
+            if isinstance(batch, list):
+                old_batch = batch
+                batch = {}
+                for key in old_batch[0].keys():
+                    batch[key] = torch.stack([item[key] for item in old_batch], dim=0)
 
-                for car_id, label, score_rec in zip(car_ids, labels, scores_rec):
-                    if car_id not in car_scores_rec:
-                        car_scores_rec[car_id] = []
-                    car_scores_rec[car_id].append(score_rec)
-                    car_labels[car_id] = label
+            car_ids = batch["car"].detach().cpu().numpy().tolist()
+            labels = batch["label"].detach().cpu().numpy().tolist()
+            batch = {key: value.to(torch.device("cuda" if torch.cuda.is_available() else "cpu")) for key, value in batch.items()}
+            with torch.no_grad():
+                outputs = model(batch)
+                target = batch["normed_time_series"][:, :, self.cfg.dyad_decoder_embedding_size :]
+                scores_rec = self.criterion_mse_eval(outputs["log_p"], target).mean(dim=[1, 2]).detach().cpu().tolist()
+
+            for car_id, label, score_rec in zip(car_ids, labels, scores_rec):
+                if car_id not in car_scores_rec:
+                    car_scores_rec[car_id] = []
+                car_scores_rec[car_id].append(score_rec)
+                car_labels[car_id] = label
 
         # Average scores for each car
         car_avg_scores_rec = {car_id: np.mean(scores) for car_id, scores in car_scores_rec.items()}
@@ -128,7 +131,7 @@ class TrainEngine(BaseTrainEngine):
             self.train_epoch(model, train_dataloader, optimizer, scheduler)
             self.save_checkpoint(model, prefix=f"latest")
 
-            if epoch < 5 or epoch % 10 == 0:
+            if epoch < 10 or epoch % 10 == 0:
                 with mlflow.start_run(run_name=self.mlflow_run_name, run_id=self.mlflow_id):
                     mlflow.log_metric("learning_rate", scheduler.get_last_lr()[0], step=self.global_step)
                     metric_dict, _ = self.evaluate(model, test_dataset)

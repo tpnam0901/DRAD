@@ -71,31 +71,33 @@ class TrainEngine(BaseTrainEngine):
         # For each car, calculate the average score across all its samples and use that for evaluation
         car_scores_rec = {}
         car_labels = {}
-        for samples in tqdm(dataset, ascii=True, desc="Evaluating"):
-            for batch in samples:
-                for k, v in batch.items():
-                    batch[k] = v.unsqueeze(0)
-                car_ids = batch["car"].detach().cpu().numpy().tolist()
-                labels = batch["label"].detach().cpu().numpy().tolist()
-                batch = {key: value.to(torch.device("cuda" if torch.cuda.is_available() else "cpu")) for key, value in batch.items()}
-                with torch.no_grad():
-                    outputs = model(batch)
-                    # normed_time_series = torch.stack(
-                    #     [
-                    #         batch["normed_voltage"],
-                    #         batch["normed_max_cell_voltage"],
-                    #         batch["normed_min_cell_voltage"],
-                    #     ],
-                    #     dim=-1,
-                    # )
-                    normed_time_series = batch["normed_time_series"][:, :, 2:]
-                    scores_rec = self.criterion_mse(outputs["logits_rec"], normed_time_series).mean(dim=[1, 2]).detach().cpu().tolist()
+        for batch in tqdm(dataset, ascii=True, desc="Evaluating"):
+            if isinstance(batch, list):
+                old_batch = batch
+                batch = {}
+                for key in old_batch[0].keys():
+                    batch[key] = torch.stack([item[key] for item in old_batch], dim=0)
+            car_ids = batch["car"].detach().cpu().numpy().tolist()
+            labels = batch["label"].detach().cpu().numpy().tolist()
+            batch = {key: value.to(torch.device("cuda" if torch.cuda.is_available() else "cpu")) for key, value in batch.items()}
+            with torch.no_grad():
+                outputs = model(batch)
+                # normed_time_series = torch.stack(
+                #     [
+                #         batch["normed_voltage"],
+                #         batch["normed_max_cell_voltage"],
+                #         batch["normed_min_cell_voltage"],
+                #     ],
+                #     dim=-1,
+                # )
+                normed_time_series = batch["normed_time_series"][:, :, 2:]
+                scores_rec = self.criterion_mse(outputs["logits_rec"], normed_time_series).mean(dim=[1, 2]).detach().cpu().tolist()
 
-                for car_id, label, score_rec in zip(car_ids, labels, scores_rec):
-                    if car_id not in car_scores_rec:
-                        car_scores_rec[car_id] = []
-                    car_scores_rec[car_id].append(score_rec)
-                    car_labels[car_id] = label
+            for car_id, label, score_rec in zip(car_ids, labels, scores_rec):
+                if car_id not in car_scores_rec:
+                    car_scores_rec[car_id] = []
+                car_scores_rec[car_id].append(score_rec)
+                car_labels[car_id] = label
 
         # Average scores for each car
         car_avg_scores_rec = {car_id: np.mean(scores) for car_id, scores in car_scores_rec.items()}
