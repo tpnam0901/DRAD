@@ -13,6 +13,7 @@ import torch
 from configs.base import Config
 from data.dataset import build_dataset
 from sklearn import metrics
+from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
 
@@ -172,13 +173,7 @@ class EvaluateEngine(object):
         confusion_matrix = np.zeros((len(each_car_errors), len(each_car_errors)))
         for i, car_id in enumerate(each_car_errors.keys()):
             for j, car_data_id in enumerate(each_car_errors.keys()):
-                # confusion_matrix[i, j] = each_car_errors[car_id][car_data_id]
-                confusion_matrix[j, i] = each_car_errors[car_id][car_data_id]  # swap i and j for correct orientation in the paper
-        # If error is lower than diagonal, set to 0
-        # for i in range(len(each_car_errors)):
-        #     for j in range(len(each_car_errors)):
-        #         if confusion_matrix[i, j] < confusion_matrix[i, i]:
-        #             confusion_matrix[i, j] = 0.0
+                confusion_matrix[i, j] = each_car_errors[car_id][car_data_id]
 
         for i in range(len(each_car_errors)):
             confusion_matrix[i, :] = confusion_matrix[i, :] - confusion_matrix[i, i]
@@ -207,10 +202,8 @@ class EvaluateEngine(object):
         for i, car_id in enumerate(each_car_errors.keys()):
             row_sum = np.sum(confusion_matrix[i, :]) / len(each_car_errors)
             col_sum = np.sum(confusion_matrix[:, i]) / len(each_car_errors)
-            # car_error_scores[car_id] = self.alpha * row_sum + self.beta * col_sum
-            car_error_scores[car_id] = (
-                self.beta * row_sum + self.alpha * col_sum
-            )  # swap alpha and beta for correct orientation in the paper
+            car_error_scores[car_id] = self.alpha * row_sum + self.beta * col_sum
+
         plt.figure(figsize=(10, 8))
         plt.bar(range(len(car_error_scores)), list(car_error_scores.values()), align="center")
         plt.xticks(ticks=np.arange(len(car_error_scores)), labels=list(car_error_scores.keys()), rotation=45)
@@ -307,6 +300,32 @@ class EvaluateEngine(object):
         """Build the model for training."""
         return getattr(networks, self.cfg.model_type)(self.cfg)
 
+    def get_dataloader(
+        self,
+        dataset,
+        batch_size,
+        shuffle=False,
+        num_workers=0,
+        pin_memory=True,
+        drop_last=False,
+        collate_fn=None,
+    ):
+        """Get dataloader for the given dataset."""
+
+        def worker_init_fn(worker_id):
+            os.sched_setaffinity(0, list(range(os.cpu_count())))
+
+        return DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            pin_memory=pin_memory,
+            collate_fn=collate_fn,  # =collate if self.args.variable_length else None,
+            num_workers=num_workers,
+            worker_init_fn=worker_init_fn,
+            drop_last=drop_last,
+        )
+
     def eval_group(self, group: List[int]) -> Dict:
         all_datasets = {}
         for car_id in group:
@@ -321,12 +340,19 @@ class EvaluateEngine(object):
             test_dataset = build_dataset(
                 self.cfg.data_root,
                 brand_num=self.cfg.brand_num,
-                mode="val",
+                mode="test",
                 car_ids=[car_id],
                 fold_num=self.cfg.fold_num,
             )
             test_dataset.set_min_max_mileage(min_mileage, max_mileage)
-
+            if self.cfg.brand_num != 3:
+                test_dataset = self.get_dataloader(
+                    test_dataset,
+                    batch_size=self.cfg.batch_size,
+                    shuffle=False,
+                    num_workers=self.cfg.num_workers,
+                    drop_last=False,
+                )
             all_datasets[car_id] = test_dataset
 
         each_car_errors = {}
@@ -337,22 +363,22 @@ class EvaluateEngine(object):
             model.eval()
             model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
             for car_data_id, car_dataset in all_datasets.items():
-                total_error = 0.0
-                total_data = 0
+                errors = []
                 with torch.no_grad():
                     for samples in car_dataset:
+                        samples = [samples] if not isinstance(samples, list) else samples
                         for batch in samples:
-                            for k, v in batch.items():
-                                batch[k] = v.unsqueeze(0)
+                            if len(batch["normed_time_series"].shape) == 2:
+                                for k, v in batch.items():
+                                    batch[k] = v.unsqueeze(0)
                             batch = {
                                 key: value.to(torch.device("cuda" if torch.cuda.is_available() else "cpu")) for key, value in batch.items()
                             }
                             outputs = model(batch)
                             scores = self.calculate_score(outputs, batch)
                             for s in scores:
-                                total_error += s
-                                total_data += 1
-                avg_error = total_error / total_data
+                                errors.append(s.item())
+                avg_error = np.mean(errors)
                 car_dict = each_car_errors.get(car_id, {})
                 car_dict[car_data_id] = avg_error
                 each_car_errors[car_id] = car_dict
@@ -365,20 +391,13 @@ class EvaluateEngine(object):
 
         if self.cfg.brand_num == 3:
             car_info = pd.read_csv(osp.join(self.cfg.data_root, "battery_brand3", "label", "all_label.csv"))
-            car_available_ids = car_info["car"].unique().tolist()
         else:
-            with open(osp.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", f"fold_{self.cfg.fold_num}_train.txt"), "r") as f:
-                car_info = f.readlines()
-            car_available_ids = list(set([int(osp.basename(f).split("_")[0]) for f in car_info]))
             car_info1 = pd.read_csv(osp.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "label", "train_label.csv"))
             car_info2 = pd.read_csv(osp.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "label", "test_label.csv"))
             car_info = pd.concat([car_info1, car_info2], ignore_index=True)
 
         car_normal_ids = car_info[car_info["label"] == 0]["car"].unique().tolist()
         cars_abnormal_ids = car_info[car_info["label"] == 1]["car"].unique().tolist()
-
-        car_normal_ids = [car_id for car_id in car_normal_ids if car_id in car_available_ids]
-        cars_abnormal_ids = [car_id for car_id in cars_abnormal_ids if car_id in car_available_ids]
 
         print("Normal cars:", car_normal_ids, "\nAbnormal cars:", cars_abnormal_ids)
 
