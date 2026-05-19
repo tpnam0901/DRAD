@@ -322,13 +322,13 @@ class EvaluateEngine(TrainEngine):
         return selected_groups, selected_gt
 
     def get_groups(self, cars_normal, cars_abnormal):
-        # selected_groups, selected_gt = self.select_groups(cars_normal, cars_abnormal, seed=2025)
+        selected_groups, selected_gt = self.select_groups(cars_normal, cars_abnormal, seed=self.cfg.seed)
 
-        group_size = 11
-        max_abnormal = 1
-        selected_groups, selected_gt = self.select_random_groups(
-            cars_normal, cars_abnormal, group_size=group_size, max_abnormal=max_abnormal, seed=2025
-        )
+        # group_size = 11
+        # max_abnormal = 1
+        # selected_groups, selected_gt = self.select_random_groups(
+        #     cars_normal, cars_abnormal, group_size=group_size, max_abnormal=max_abnormal, seed=2025
+        # )
 
         return selected_groups, selected_gt
 
