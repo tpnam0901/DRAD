@@ -311,6 +311,7 @@ class TrainEngine(object):
         return metric_dict, (car_labels, car_avg_scores_cls, car_avg_scores_rec)
 
     def load_data(self):
+        self.logger.info("Loading data... It may take a while...")
         if self.cfg.brand_num == 3:
             car_info = pd.read_csv(osp.join(self.cfg.data_root, "battery_brand3", "label", "all_label.csv"))
         else:

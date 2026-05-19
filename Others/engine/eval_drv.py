@@ -21,7 +21,7 @@ class EvaluateEngine(object):
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self.logger = logging.getLogger("TrainEngine")
-        self.logger.level = logging.DEBUG
+        self.logger.level = logging.INFO
         self.logger.debug("THIS IS A TEST LOGGING DEBUG MESSAGE. IF YOU SEE THIS, LOGGING WORKS!")
 
         self.alpha = 1
@@ -228,6 +228,7 @@ class EvaluateEngine(object):
                 selected_normals = cars_normal[start_idx : start_idx + num_normal]
                 group = selected_normals + [abnormal_car]
                 selected_groups.append(group)
+
         else:
             abnormal_indices = list(range(len(cars_abnormal)))
             random.shuffle(abnormal_indices)
@@ -364,6 +365,7 @@ class EvaluateEngine(object):
             model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
             for car_data_id, car_dataset in all_datasets.items():
                 errors = []
+
                 with torch.no_grad():
                     for samples in car_dataset:
                         samples = [samples] if not isinstance(samples, list) else samples
@@ -410,7 +412,7 @@ class EvaluateEngine(object):
 
         num_normal = -1
         num_abnormal = 1
-        selected_groups = self.build_car_groups(num_normal=num_normal, num_abnormal=num_abnormal, seed=2025)
+        selected_groups = self.build_car_groups(num_normal=num_normal, num_abnormal=num_abnormal, seed=42)
 
         eval_metrics_dict = {"mean_std": {}, "iqr": {}, "grouping": {}}
 

@@ -158,15 +158,16 @@ class B12Dataset(BaseDataset):
         meta_data = pd.read_csv(osp.join(data_root, f"{mode}_labels.csv"))
         # Remove samples that are not in car_ids
         meta_data = meta_data[meta_data["car"].isin(car_ids)]
-        print("Loading data into memory, it may take a while...")
-        for _, row in tqdm(meta_data.iterrows(), total=len(meta_data)):
+        # print("Loading data into memory, it may take a while...")
+        for _, row in meta_data.iterrows():
             data, _ = torch.load(row["path"])
             self.data.append((data, row))
             sample_mileage.append(row["mileage"])
 
         self.indices = list(range(len(self.data)))
-        self.max_mileage = max(sample_mileage)
-        self.min_mileage = min(sample_mileage)
+
+        self.max_mileage = max(sample_mileage, default=-1)
+        self.min_mileage = min(sample_mileage, default=-1)
 
         current_dir = osp.dirname(os.path.abspath(__file__))
         self.mean = np.load(osp.join(current_dir, f"b{brand_num}_mean.npy"))
@@ -197,9 +198,6 @@ class B12Dataset(BaseDataset):
         return self._process_data(df, meta_data)
 
     def _process_data(self, df_raw: np.ndarray, meta_data: Dict) -> Dict:
-        assert (
-            self.min_mileage != -1 and self.max_mileage != -1
-        ), "Min and max mileage must be set before getting items for validation or testing."
 
         # raw_voltage = df_raw[:, self.column.index("volt")]
         # raw_current = df_raw[:, self.column.index("current")]

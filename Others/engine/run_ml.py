@@ -54,7 +54,7 @@ class TrainEngine(object):
         return build_dataset(
             self.cfg.data_root,
             brand_num=self.cfg.brand_num,
-            mode="val",
+            mode="test",
             car_ids=car_ids,
             fold_num=self.cfg.fold_num,
         )
@@ -279,56 +279,5 @@ class TrainEngine(object):
         best_y_true = np.array(best_y_true)
         metric_dict = self.calculate_metrics(best_y_true, best_y_pred_if)
         self.logger.info(f"Evaluation results using Isolation Forest-based anomaly detection with threshold {best_ratio}:")
-        for key, value in metric_dict.items():
-            self.logger.info(f"Test {key}: {value:.4f}")
-
-        self.logger.info("---------------- Starting KNN-based anomaly detection on test data ---------------")
-
-        knn = KNeighborsClassifier(n_neighbors=5)
-        knn.fit(x_train, y_train[:, 0])  # Use label for training
-        y_pred = knn.predict(x_test)
-        y_true = y_test[:, 0]  # Use label for evaluation
-        self.logger.info(f"Predicted anomalies: {np.sum(y_pred)}, {y_pred}")
-        self.logger.info(f"True anomalies: {np.sum(y_true)}, {y_true}")
-        car_charge_counts = {}
-        for (label, car_id, charge_id), anomaly in zip(y_test, y_pred == 1):
-            if car_id not in car_charge_counts:
-                car_charge_counts[car_id] = {"total": 0, "anomalies": 0}
-            car_charge_counts[car_id]["total"] += 1
-            if anomaly:
-                car_charge_counts[car_id]["anomalies"] += 1
-
-        best_y_pred_knn = []
-        best_y_true = []
-        best_f1 = -1
-        best_ratio = 0
-        for ratio in tqdm(range(3000)):
-            ratio = ratio / 1000
-            y_pred_knn = []
-            y_true = []
-            for car_id, counts in car_charge_counts.items():
-                num_anomalies = counts["anomalies"]
-                num_total = counts["total"]
-                # print(
-                #     f"Car ID: {car_id}, Anomalies: {num_anomalies}, Total: {num_total}, Ratio: {num_anomalies / num_total:.4f}"
-                # )  # Debugging counts
-                y_pred_knn.append(1 if (num_anomalies / num_total) > ratio else 0)
-                y_true.append(1 if car_id in y_test[y_test[:, 0] == 1][:, 1] else 0)
-            y_pred_knn = np.array(y_pred_knn)
-            y_true = np.array(y_true)
-            local_metric_dict = self.calculate_metrics(y_true, y_pred_knn)
-            if local_metric_dict["f1"] > best_f1:
-                best_f1 = local_metric_dict["f1"]
-                best_y_pred_knn = y_pred_knn
-                best_y_true = y_true
-                best_ratio = ratio
-
-        self.logger.info(f"Predicted anomalies KNN: {np.sum(best_y_pred_knn)}, {best_y_pred_knn}")
-        self.logger.info(f"True anomalies: {np.sum(best_y_true)}, {best_y_true}")
-        best_y_pred_knn = np.array(best_y_pred_knn)
-        best_y_true = np.array(best_y_true)
-        metric_dict = self.calculate_metrics(best_y_true, best_y_pred_knn)
-
-        self.logger.info(f"Evaluation results using KNN-based anomaly detection with threshold {best_ratio}:")
         for key, value in metric_dict.items():
             self.logger.info(f"Test {key}: {value:.4f}")
