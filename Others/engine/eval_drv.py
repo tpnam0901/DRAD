@@ -27,7 +27,7 @@ class EvaluateEngine(object):
         self.alpha = 1
         self.beta = 2
 
-    def calculate_metrics(self, preds: np.ndarray, targets: np.ndarray) -> Dict:
+    def calculate_metrics(self, targets: np.ndarray, preds: np.ndarray) -> Dict:
         """Calculate metrics given predictions and targets."""
         metric_dict = {}
 
