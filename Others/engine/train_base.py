@@ -174,7 +174,7 @@ class TrainEngine(object):
 
         return {"total_loss": total_loss, "loss_cls": loss_cls, "loss_mileage": loss_mileage, "loss_reg": loss_reg}
 
-    def calculate_metrics(self, preds: np.ndarray, targets: np.ndarray, num_linspace: int = 1000) -> Dict:
+    def calculate_metrics(self, targets: np.ndarray, preds: np.ndarray, num_linspace: int = 1000) -> Dict:
         """Calculate metrics given predictions and targets."""
         metric_dict = {}
         for threshold in np.linspace(np.min(preds), np.max(preds), num=num_linspace):
@@ -235,7 +235,7 @@ class TrainEngine(object):
         optimizer.step()
 
         predictions = outputs["logits_cls"].sigmoid().squeeze().detach().cpu().numpy()
-        metric_dict = self.calculate_metrics(predictions, batch["label"].detach().cpu().numpy(), num_linspace=5)
+        metric_dict = self.calculate_metrics(batch["label"].detach().cpu().numpy(), predictions, num_linspace=5)
 
         return loss_dict, metric_dict
 
@@ -297,10 +297,10 @@ class TrainEngine(object):
         # Calculate metrics based on average scores
         y_true = [car_labels[car_id] for car_id in car_avg_scores_cls.keys()]
         y_scores_cls = [car_avg_scores_cls[car_id] for car_id in car_avg_scores_cls.keys()]
-        metric_dict_cls = self.calculate_metrics(np.array(y_scores_cls), np.array(y_true))
+        metric_dict_cls = self.calculate_metrics(np.array(y_true), np.array(y_scores_cls))
 
         y_scores_rec = [car_avg_scores_rec[car_id] for car_id in car_avg_scores_rec.keys()]
-        metric_dict_rec = self.calculate_metrics(np.array(y_scores_rec), np.array(y_true))
+        metric_dict_rec = self.calculate_metrics(np.array(y_true), np.array(y_scores_rec))
 
         metric_dict = {}
         for key in metric_dict_cls.keys():

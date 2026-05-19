@@ -106,7 +106,7 @@ class TrainEngine(BaseTrainEngine):
         # Calculate metrics based on average scores
         y_true = [car_labels[car_id] for car_id in car_avg_scores_rec.keys()]
         y_scores_rec = [car_avg_scores_rec[car_id] for car_id in car_avg_scores_rec.keys()]
-        metric_dict_rec = self.calculate_metrics(np.array(y_scores_rec), np.array(y_true))
+        metric_dict_rec = self.calculate_metrics(np.array(y_true), np.array(y_scores_rec))
 
         metric_dict = {}
         for key in metric_dict_rec.keys():

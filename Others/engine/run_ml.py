@@ -85,7 +85,7 @@ class TrainEngine(object):
             drop_last=drop_last,
         )
 
-    def calculate_metrics(self, preds: np.ndarray, targets: np.ndarray) -> Dict:
+    def calculate_metrics(self, targets: np.ndarray, preds: np.ndarray) -> Dict:
         """Calculate metrics given predictions and targets."""
         metric_dict = {}
         metric_dict["precision"] = metrics.precision_score(targets, preds, average="binary", zero_division=0)
@@ -215,7 +215,7 @@ class TrainEngine(object):
                 y_true.append(1 if car_id in y_test[y_test[:, 0] == 1][:, 1] else 0)
             y_pred_pca = np.array(y_pred_pca)
             y_true = np.array(y_true)
-            local_metric_dict = self.calculate_metrics(y_pred_pca, y_true)
+            local_metric_dict = self.calculate_metrics(y_true, y_pred_pca)
             if local_metric_dict["f1"] > best_f1:
                 best_f1 = local_metric_dict["f1"]
                 best_y_pred_pca = y_pred_pca
@@ -226,7 +226,7 @@ class TrainEngine(object):
         self.logger.info(f"True anomalies: {np.sum(best_y_true)}, {best_y_true}")
         best_y_pred_pca = np.array(best_y_pred_pca)
         best_y_true = np.array(best_y_true)
-        metric_dict = self.calculate_metrics(best_y_pred_pca, best_y_true)
+        metric_dict = self.calculate_metrics(best_y_true, best_y_pred_pca)
 
         self.logger.info(f"Evaluation results using PCA-based anomaly detection with threshold {best_ratio}:")
         for key, value in metric_dict.items():
@@ -266,7 +266,7 @@ class TrainEngine(object):
 
             y_pred_if = np.array(y_pred_if)
             y_true = np.array(y_true)
-            local_metric_dict = self.calculate_metrics(y_pred_if, y_true)
+            local_metric_dict = self.calculate_metrics(y_true, y_pred_if)
             if local_metric_dict["f1"] > best_f1:
                 best_f1 = local_metric_dict["f1"]
                 best_y_pred_if = y_pred_if
@@ -277,7 +277,7 @@ class TrainEngine(object):
 
         best_y_pred_if = np.array(best_y_pred_if)
         best_y_true = np.array(best_y_true)
-        metric_dict = self.calculate_metrics(best_y_pred_if, best_y_true)
+        metric_dict = self.calculate_metrics(best_y_true, best_y_pred_if)
         self.logger.info(f"Evaluation results using Isolation Forest-based anomaly detection with threshold {best_ratio}:")
         for key, value in metric_dict.items():
             self.logger.info(f"Test {key}: {value:.4f}")
@@ -316,7 +316,7 @@ class TrainEngine(object):
                 y_true.append(1 if car_id in y_test[y_test[:, 0] == 1][:, 1] else 0)
             y_pred_knn = np.array(y_pred_knn)
             y_true = np.array(y_true)
-            local_metric_dict = self.calculate_metrics(y_pred_knn, y_true)
+            local_metric_dict = self.calculate_metrics(y_true, y_pred_knn)
             if local_metric_dict["f1"] > best_f1:
                 best_f1 = local_metric_dict["f1"]
                 best_y_pred_knn = y_pred_knn
@@ -327,7 +327,7 @@ class TrainEngine(object):
         self.logger.info(f"True anomalies: {np.sum(best_y_true)}, {best_y_true}")
         best_y_pred_knn = np.array(best_y_pred_knn)
         best_y_true = np.array(best_y_true)
-        metric_dict = self.calculate_metrics(best_y_pred_knn, best_y_true)
+        metric_dict = self.calculate_metrics(best_y_true, best_y_pred_knn)
 
         self.logger.info(f"Evaluation results using KNN-based anomaly detection with threshold {best_ratio}:")
         for key, value in metric_dict.items():
