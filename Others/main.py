@@ -1,4 +1,7 @@
 import logging
+import warnings
+
+warnings.filterwarnings("ignore")  # Ignore all warnings globally
 
 logging.root.setLevel(logging.INFO)
 logging.basicConfig(level=logging.root.level, format="%(name)s - %(levelname)s - %(message)s")
