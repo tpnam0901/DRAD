@@ -1,9 +1,8 @@
 import os.path as osp
 from typing import Dict
 
-import torch
-
 import networks
+import torch
 
 from .eval_drv import EvaluateEngine as EvaluateEngineBase
 
@@ -30,7 +29,7 @@ class EvaluateEngine(EvaluateEngineBase):
         # Reconstruction loss
         logits_rec = predictions["log_p"]
 
-        normed_time_series = targets_dict["normed_time_series"][:, :, 2:]
+        normed_time_series = targets_dict["normed_time_series"][:, :, self.cfg.dyad_decoder_embedding_size :]
         loss_reg = self.criterion_mse(logits_rec, normed_time_series).mean(dim=[1, 2])
 
         return loss_reg
