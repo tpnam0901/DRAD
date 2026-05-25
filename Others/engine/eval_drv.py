@@ -24,7 +24,7 @@ class EvaluateEngine(object):
         self.logger.level = logging.INFO
         self.logger.debug("THIS IS A TEST LOGGING DEBUG MESSAGE. IF YOU SEE THIS, LOGGING WORKS!")
 
-        self.alpha = 1 if self.cfg.brand_num == 3 else 2
+        self.alpha = 1 if self.cfg.brand_num == 3 else 1.5
         self.beta = 2 if self.cfg.brand_num == 3 else 1
 
     def calculate_metrics(self, targets: np.ndarray, preds: np.ndarray) -> Dict:
