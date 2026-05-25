@@ -24,8 +24,8 @@ class EvaluateEngine(object):
         self.logger.level = logging.INFO
         self.logger.debug("THIS IS A TEST LOGGING DEBUG MESSAGE. IF YOU SEE THIS, LOGGING WORKS!")
 
-        self.alpha = 1
-        self.beta = 2
+        self.alpha = 1 if self.cfg.brand_num == 3 else 2
+        self.beta = 2 if self.cfg.brand_num == 3 else 1
 
     def calculate_metrics(self, targets: np.ndarray, preds: np.ndarray) -> Dict:
         """Calculate metrics given predictions and targets."""
@@ -89,6 +89,8 @@ class EvaluateEngine(object):
         mean_error = np.mean(error_values)
         std_error = np.std(error_values)
         threshold = mean_error + 1.5 * std_error
+        if self.cfg.brand_num != 3:
+            threshold = mean_error + 1.0 * std_error
         outliers = {car_id: score for car_id, score in car_error_scores.items() if score > threshold}
         return outliers, car_error_scores
 
@@ -369,15 +371,22 @@ class EvaluateEngine(object):
                 with torch.no_grad():
                     for samples in car_dataset:
                         samples = [samples] if not isinstance(samples, list) else samples
-                        for batch in samples:
-                            if len(batch["normed_time_series"].shape) == 2:
-                                for k, v in batch.items():
-                                    batch[k] = v.unsqueeze(0)
-                            batch = {
-                                key: value.to(torch.device("cuda" if torch.cuda.is_available() else "cpu")) for key, value in batch.items()
-                            }
-                            outputs = model(batch)
-                            scores = self.calculate_score(outputs, batch)
+                        if isinstance(samples, list):
+                            for batch in samples:
+                                if len(batch["normed_time_series"].shape) == 2:
+                                    for k, v in batch.items():
+                                        batch[k] = v.unsqueeze(0)
+                                batch = {
+                                    key: value.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+                                    for key, value in batch.items()
+                                }
+                                outputs = model(batch)
+                                scores = self.calculate_score(outputs, batch)
+                                for s in scores:
+                                    errors.append(s.item())
+                        else:
+                            outputs = model(samples)
+                            scores = self.calculate_score(outputs, samples)
                             for s in scores:
                                 errors.append(s.item())
                 avg_error = np.mean(errors)
@@ -410,9 +419,10 @@ class EvaluateEngine(object):
     def run(self):
         """Run the training process."""
 
+        seed = 2025 if self.cfg.brand_num == 3 else self.cfg.seed
         num_normal = -1
         num_abnormal = 1
-        selected_groups = self.build_car_groups(num_normal=num_normal, num_abnormal=num_abnormal, seed=42)
+        selected_groups = self.build_car_groups(num_normal=num_normal, num_abnormal=num_abnormal, seed=seed)
 
         eval_metrics_dict = {"mean_std": {}, "iqr": {}, "grouping": {}}
 
