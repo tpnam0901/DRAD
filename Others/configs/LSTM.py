@@ -6,8 +6,8 @@ class Config(BaseConfig):
         super(Config, self).__init__()
         # Seed used in the paper for brand 1 (Dahu): 980, 2025, 3189, 6315, 8455
         # Seed used in the paper for brand 3 (Naobop): 285, 2743, 3580, 4702, 4930
-        self.brand_num = 1
-        self.seed = 2025
+        self.brand_num = 3
+        self.seed = 285
 
         self.optimizer = "adamw"
         self.model_type = "LSTM"
