@@ -8,7 +8,6 @@ import random
 
 import numpy as np
 import torch
-
 from configs.base import Config, import_config
 
 
@@ -86,6 +85,9 @@ if __name__ == "__main__":
 
     if args.mode == "DRV":
         if cfg.model_type == "DRV":
+            from engine.evaluate_drv import EvaluateEngine
+            from engine.train_drv import TrainEngine
+        elif cfg.model_type == "LSTM":
             from engine.evaluate_drv import EvaluateEngine
             from engine.train_drv import TrainEngine
         elif cfg.model_type == "DRVShift":

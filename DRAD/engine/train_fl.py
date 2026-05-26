@@ -2,6 +2,7 @@ import glob
 import os.path as osp
 from typing import Dict
 
+import mlflow
 import pandas as pd
 import torch
 from data.naobop_dataset import TrainNaoBopDataset
@@ -52,6 +53,47 @@ class TrainEngine(BaseEngine):
                 pin_memory=pin_memory,
             ),
         }
+
+    def train_epoch(self, model, dataloader, optimizer, scheduler, prefix="") -> float:
+        loss_epoch = 0.0
+        loss_dict = {}
+        model.train()
+        model.cuda()
+        with mlflow.start_run(run_name=self.mlflow_run_name, run_id=self.mlflow_id):
+            for batch in dataloader:
+                optimizer.zero_grad()
+                # Forward pass
+                outputs = self.forward(model, batch)
+                # Compute loss
+                loss_all = self.calculate_loss(outputs, batch)
+                # Backward pass and optimization
+
+                loss_all["total_loss"].backward()
+                optimizer.step()
+                self.step += 1
+
+                loss_epoch += loss_all["total_loss"].item()
+
+                desc = f"Loss: {loss_all['total_loss'].item():.4f}"
+                for key, value in loss_all.items():
+                    if key != "total_loss":
+                        desc += f", {key}: {value.item():.4f}"
+                        loss_dict[key] = loss_dict.get(key, 0.0) + value.item()
+
+            # scheduler.step()
+            mlflow.log_metric(f"{prefix}learning_rate", scheduler.get_last_lr()[0], step=self.step)
+            mlflow.log_metric(
+                f"{prefix}train_epoch_loss",
+                loss_epoch / len(dataloader),
+                step=self.step,
+            )
+            for key, value in loss_dict.items():
+                mlflow.log_metric(
+                    f"{prefix}train_{key}_epoch",
+                    value / len(dataloader),
+                    step=self.step,
+                )
+        return loss_epoch / len(dataloader)
 
     def save_checkpoint(self, model, epoch: int, keep_only_latest: bool = True, prefix: str = "") -> str:
         """Save model checkpoint.
@@ -104,7 +146,7 @@ class TrainEngine(BaseEngine):
             ckpt_path = self.save_checkpoint(model, 0, keep_only_latest=True, prefix=f"car_{car_id}_")
             car_dict[car_id] = (ckpt_path, datasets["train_loader"], len(datasets["train_dataset"]))
 
-        for round in range(1000):
+        for round in range(500):
             total_loss = 0.0
             with tqdm(total=len(car_normal_ids), unit="Car") as pbar:
                 for idx, car_id in enumerate(car_normal_ids):

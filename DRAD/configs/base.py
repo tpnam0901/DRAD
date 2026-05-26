@@ -94,6 +94,7 @@ class Config(BaseConfig):
         self.current_time: str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         self.keep_only_latest: bool = True
 
+        self.min_loss: float = 0.005
         self.batch_size: int = 128
         self.num_epochs: int = 1000
         self.num_workers: int = 0

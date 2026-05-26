@@ -6,12 +6,15 @@ class Config(BaseConfig):
 
     def __init__(self):
         super(Config, self).__init__()
-
+        # Seed used in the paper for brand3 (Naobop): 980, 2025, 3189, 6315, 8455
+        self.seed = 8455 
+        self.brand = "brand3"
+        self.data_root = f"data/battery_data/battery_{self.brand}"
         # Modify default parameters
         self.name = "DRV_{}_{}".format(self.brand, self.seed)
 
         self.model_type: str = "DRV"
-
+        self.min_loss: float = 0.22
         # DyAD
         self.dyad_rnn_type: str = "gru"
         self.dyad_hidden_size: int = 256

@@ -8,8 +8,9 @@ import numpy as np
 import pandas as pd
 import torch
 from configs.base import Config
+from data.b1dataset import B1Dataset
 from data.naobop_dataset import TrainNaoBopDataset
-from torch.optim import SGD
+from torch.optim import SGD, AdamW
 from tqdm.auto import tqdm
 from utils.dataloader import get_dataloader
 from utils.schedulers import CosineAnnealingLR
@@ -21,8 +22,17 @@ class TrainEngine(BaseEngine):
     def __init__(self, cfg: Config):
         super(TrainEngine, self).__init__(osp.join(cfg.ckpt_dir, "{}_{}".format(cfg.name, cfg.current_time), "train.log"))
         self.cfg = cfg
-        cfg.save(osp.join(cfg.ckpt_dir, "{}_{}".format(self.cfg.name, self.cfg.current_time), "config.json"))
-        self.setup_mlflow(run_name="{}_{}".format(cfg.name, cfg.current_time), experiment_name="train_experiment")
+        cfg.save(
+            osp.join(
+                cfg.ckpt_dir,
+                "{}_{}".format(self.cfg.name, self.cfg.current_time),
+                "config.json",
+            )
+        )
+        self.setup_mlflow(
+            run_name="{}_{}".format(cfg.name, cfg.current_time),
+            experiment_name="train_experiment",
+        )
         with mlflow.start_run(run_name=self.mlflow_run_name, run_id=self.mlflow_id):
             # Log configuration parameters
             mlflow.log_params(vars(cfg))
@@ -60,13 +70,20 @@ class TrainEngine(BaseEngine):
             Dict: A dictionary containing training and validation datasets and dataloaders.
         """
         self.logger.info("Building training dataset.")
-        train_dataset = TrainNaoBopDataset(
-            data_root,
-            f"fold_{fold_num}_train.txt",
-            max_length,
-            car_id=car_id,
-        )
-        self.logger.info("Building validation dataset.")
+        if self.cfg.brand == "brand1":
+            train_dataset = B1Dataset(
+                data_root,
+                brand_num=1,
+                car_ids=[car_id],
+                mode="train",
+            )
+        else:
+            train_dataset = TrainNaoBopDataset(
+                data_root,
+                f"fold_{fold_num}_train.txt",
+                max_length,
+                car_id=car_id,
+            )
         return {
             "train_dataset": train_dataset,
             "train_loader": get_dataloader(
@@ -162,9 +179,17 @@ class TrainEngine(BaseEngine):
 
             scheduler.step()
             mlflow.log_metric(f"{prefix}learning_rate", scheduler.get_last_lr()[0], step=self.step)
-            mlflow.log_metric(f"{prefix}train_epoch_loss", loss_epoch / len(dataloader), step=self.step)
+            mlflow.log_metric(
+                f"{prefix}train_epoch_loss",
+                loss_epoch / len(dataloader),
+                step=self.step,
+            )
             for key, value in loss_dict.items():
-                mlflow.log_metric(f"{prefix}train_{key}_epoch", value / len(dataloader), step=self.step)
+                mlflow.log_metric(
+                    f"{prefix}train_{key}_epoch",
+                    value / len(dataloader),
+                    step=self.step,
+                )
         return loss_epoch / len(dataloader)
 
     def run(self):
@@ -173,11 +198,15 @@ class TrainEngine(BaseEngine):
         if self.cfg.brand == "brand3":
             car_info = pd.read_csv(osp.join(self.cfg.data_root, "label", "all_label.csv"))
             car_ids = car_info["car"].unique().tolist()
-        else:
+        elif self.cfg.brand == "brand2":
             with open(osp.join(self.cfg.data_root, f"fold_{self.cfg.fold_num}_train.txt"), "r") as f:
                 car_info = f.readlines()
             car_ids = list(set([int(osp.basename(f).split("_")[0]) for f in car_info]))
-        
+        else:
+            car_info1 = pd.read_csv(osp.join(self.cfg.data_root, "label", "train_label.csv"))
+            car_info2 = pd.read_csv(osp.join(self.cfg.data_root, "label", "test_label.csv"))
+            car_info = pd.concat([car_info1, car_info2], ignore_index=True)
+            car_ids = car_info["car"].unique().tolist()
 
         for idx, car_id in enumerate(car_ids):
             datasets = self.load_dataset(
@@ -192,13 +221,43 @@ class TrainEngine(BaseEngine):
             train_loader = datasets["train_loader"]
             self.logger.info(f"Starting training for car {car_id} ({idx + 1}/{len(car_ids)})")
             model = self.build_model()
-            optimizer = SGD(model.parameters(), lr=self.cfg.learning_rate, momentum=0.99, weight_decay=1e-4)
+            optimizer = SGD(
+                model.parameters(),
+                lr=self.cfg.learning_rate,
+                momentum=0.99,
+                weight_decay=1e-4,
+            )
+            if self.cfg.brand == "brand1":
+                optimizer = AdamW(model.parameters(), lr=self.cfg.learning_rate, weight_decay=1e-4)
             scheduler = CosineAnnealingLR(optimizer, self.cfg)
 
-            with tqdm(total=self.cfg.num_epochs, unit="epoch") as pbar:
-                for epoch in range(self.cfg.num_epochs):
-                    loss_epoch = self.train_epoch(model, train_loader, optimizer, scheduler, prefix=f"car_{car_id}_")
-                    self.save_checkpoint(model, epoch + 1, keep_only_latest=True, prefix=f"car_{car_id}_")
-                    pbar.set_description(f"Car {car_id} Training - Loss: {loss_epoch:.4f}")
-                    pbar.update(1)
+            epoch = 0
+            total_epochs = self.cfg.num_epochs if self.cfg.brand == "brand3" else 2000
+            with tqdm(total=total_epochs, unit="epoch") as pbar:
+                if self.cfg.brand != "brand3":
+                    loss_epoch = 99999
+                    while loss_epoch > self.cfg.min_loss and epoch < total_epochs:
+                        epoch += 1
+                        loss_epoch = self.train_epoch(
+                            model,
+                            train_loader,
+                            optimizer,
+                            scheduler,
+                            prefix=f"car_{car_id}_",
+                        )
+                        self.save_checkpoint(model, epoch + 1, keep_only_latest=True, prefix=f"car_{car_id}_")
+                        pbar.set_description(f"Car {car_id} Training - Loss: {loss_epoch:.4f}")
+                        pbar.update(1)
+                else:
+                    for epoch in range(self.cfg.num_epochs):
+                        loss_epoch = self.train_epoch(
+                            model,
+                            train_loader,
+                            optimizer,
+                            scheduler,
+                            prefix=f"car_{car_id}_",
+                        )
+                        self.save_checkpoint(model, epoch + 1, keep_only_latest=True, prefix=f"car_{car_id}_")
+                        pbar.set_description(f"Car {car_id} Training - Loss: {loss_epoch:.4f}")
+                        pbar.update(1)
         self.logger.info("Training completed.")
