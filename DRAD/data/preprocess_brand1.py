@@ -14,7 +14,7 @@ from tqdm.auto import tqdm
 
 
 def main(data_root: str):
-    brand_num = [1, 2]
+    brand_num = [1]
     for brand in brand_num:
         logging.info(f"Processing brand {brand}/{len(brand_num)}...")
         train_path = os.path.join(data_root, f"battery_brand{brand}", "train")
@@ -72,6 +72,7 @@ def main(data_root: str):
             train_writer.writerow(["car", "label", "mileage", "charge_segment", "filename", "path"])
             test_writer.writerow(["car", "label", "mileage", "charge_segment", "filename", "path"])
             for car_number, car_data in all_car_dict.items():
+                car_data.sort(key=lambda x: x[4])  # Sort by filename (index 4)
                 random.shuffle(car_data)
                 split_index = int(0.8 * len(car_data))
                 train_data = car_data[:split_index]
