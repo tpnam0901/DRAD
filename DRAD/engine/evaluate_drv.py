@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import torch
 from configs.base import Config
+from data.b1dataset import B1Dataset
 from data.naobop_dataset import EvalNaoBopDataset
 from sklearn.metrics import (
     accuracy_score,
@@ -17,6 +18,7 @@ from sklearn.metrics import (
     recall_score,
 )
 from tqdm.auto import tqdm
+from utils.dataloader import get_dataloader
 
 from engine.train import TrainEngine
 
@@ -29,12 +31,13 @@ class EvaluateEngine(TrainEngine):
         self.cfg = cfg
         self.loss_nll = torch.nn.SmoothL1Loss(reduction="mean")
         self.loss_mse = torch.nn.MSELoss(reduction="mean")
+        self.loss_mse2 = torch.nn.MSELoss(reduction="none")
         self.best_val_loss = float("inf")
         self.step = 1
         self.logger = logging.getLogger("EvaluateEngine")
 
-        self.alpha = 1
-        self.beta = 2
+        self.alpha = 1 if self.cfg.brand == "brand3" else 1.5
+        self.beta = 2 if self.cfg.brand == "brand3" else 1
 
     def calculate_score(self, predictions: Dict, targets_dict: Dict) -> Dict:
         """Calculate MSE loss given predictions and targets.
@@ -76,16 +79,32 @@ class EvaluateEngine(TrainEngine):
         self.logger.info(f"Evaluating group: {group}")
         all_datasets = {}
         for car_id in group:
-            datasets = EvalNaoBopDataset(
-                self.cfg.data_root,
-                f"fold_{self.cfg.fold_num}_train.txt",
-                self.cfg.max_length,
-                car_id=car_id,
-            )
-            longest_charge_data = []
-            for data in iter(datasets):
-                longest_charge_data.extend(data)
-            all_datasets[car_id] = longest_charge_data
+            if self.cfg.brand == "brand1":
+                datasets = B1Dataset(
+                    self.cfg.data_root,
+                    brand_num=1,
+                    car_ids=[car_id],
+                    mode="train",
+                )
+                all_datasets[car_id] = get_dataloader(
+                    datasets,
+                    batch_size=self.cfg.batch_size,
+                    shuffle=False,
+                    num_workers=self.cfg.num_workers,
+                    pin_memory=self.cfg.pin_memory,
+                    drop_last=False,
+                )
+            else:
+                datasets = EvalNaoBopDataset(
+                    self.cfg.data_root,
+                    f"fold_{self.cfg.fold_num}_train.txt",
+                    self.cfg.max_length,
+                    car_id=car_id,
+                )
+                longest_charge_data = []
+                for data in iter(datasets):
+                    longest_charge_data.extend(data)
+                all_datasets[car_id] = longest_charge_data
 
         each_car_errors = {}
         for car_id in tqdm(group):
@@ -103,9 +122,19 @@ class EvaluateEngine(TrainEngine):
                 with torch.no_grad():
                     for charge_data in data:
                         output = model(charge_data)
-                        scores = self.calculate_score(output, charge_data)
-                        total_error += scores["score"]
-                        total_data += 1
+                        if self.cfg.brand == "brand1":
+                            logits = output["log_p"]
+                            targets = charge_data["preprocess_inputs"]
+                            if len(targets.shape) == 2:
+                                targets = targets.unsqueeze(0)
+                            targets = targets[:, :, self.cfg.dyad_decoder_embedding_size :].float().cuda()
+                            loss = self.loss_mse2(logits, targets).mean(dim=[1, 2])
+                            total_error += loss.sum().item()
+                            total_data += len(loss)
+                        else:
+                            scores = self.calculate_score(output, charge_data)
+                            total_error += scores["score"]
+                            total_data += 1
                 avg_error = total_error / total_data
                 car_dict = each_car_errors.get(car_id, {})
                 car_dict[car_data_id] = avg_error
@@ -136,7 +165,9 @@ class EvaluateEngine(TrainEngine):
         error_values = np.array(list(car_error_scores.values()))
         mean_error = np.mean(error_values)
         std_error = np.std(error_values)
-        threshold = mean_error + 1.5 * std_error
+        threshold = mean_error + 1.0 * std_error
+        if self.cfg.brand == "brand3":
+            threshold = mean_error + 1.5 * std_error
         outliers = {car_id: score for car_id, score in car_error_scores.items() if score > threshold}
         return outliers, car_error_scores
 
@@ -322,12 +353,12 @@ class EvaluateEngine(TrainEngine):
         return selected_groups, selected_gt
 
     def get_groups(self, cars_normal, cars_abnormal):
-        selected_groups, selected_gt = self.select_groups(cars_normal, cars_abnormal, seed=self.cfg.seed)
+        selected_groups, selected_gt = self.select_groups(cars_normal, cars_abnormal, seed=2025)
 
         # group_size = 11
         # max_abnormal = 1
         # selected_groups, selected_gt = self.select_random_groups(
-        #     cars_normal, cars_abnormal, group_size=group_size, max_abnormal=max_abnormal, seed=2025
+        #    cars_normal, cars_abnormal, group_size=group_size, max_abnormal=max_abnormal, seed=2025
         # )
 
         return selected_groups, selected_gt
@@ -339,13 +370,18 @@ class EvaluateEngine(TrainEngine):
         if self.cfg.brand == "brand3":
             car_info = pd.read_csv(osp.join(self.cfg.data_root, "label", "all_label.csv"))
             car_available_ids = car_info["car"].unique().tolist()
-        else:
+        elif self.cfg.brand == "brand2":
             with open(osp.join(self.cfg.data_root, f"fold_{self.cfg.fold_num}_train.txt"), "r") as f:
                 car_info = f.readlines()
             car_available_ids = list(set([int(osp.basename(f).split("_")[0]) for f in car_info]))
             car_info1 = pd.read_csv(osp.join(self.cfg.data_root, "label", "train_label.csv"))
             car_info2 = pd.read_csv(osp.join(self.cfg.data_root, "label", "test_label.csv"))
             car_info = pd.concat([car_info1, car_info2], ignore_index=True)
+        else:
+            car_info1 = pd.read_csv(osp.join(self.cfg.data_root, "label", "train_label.csv"))
+            car_info2 = pd.read_csv(osp.join(self.cfg.data_root, "label", "test_label.csv"))
+            car_info = pd.concat([car_info1, car_info2], ignore_index=True)
+            car_available_ids = car_info["car"].unique().tolist()
 
         cars_normal = car_info[car_info["label"] == 0]["car"].unique().tolist()
         cars_abnormal = car_info[car_info["label"] == 1]["car"].unique().tolist()
@@ -426,6 +462,12 @@ class EvaluateEngine(TrainEngine):
             avg_precision = np.mean(vals["precision"])
             avg_recall = np.mean(vals["recall"])
             print(f"Method: {method} - Accuracy: {avg_acc:.4f}, F1: {avg_f1:.4f}, Precision: {avg_precision:.4f}, Recall: {avg_recall:.4f}")
+
+        # # Save all_group_errors to pickle file for plot
+        # import pickle
+
+        # with open("all_group_errors.pkl", "wb") as f:
+        #     pickle.dump(all_group_errors, f)
 
         # Overall metrics
         print("Overall metrics across all groups:")
