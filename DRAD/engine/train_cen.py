@@ -3,13 +3,14 @@ from typing import Any, Dict, List
 
 import pandas as pd
 import torch
+from data.b1dataset import B1Dataset
+from data.naobop_dataset import TrainNaoBopDataset as BaseDataset
 from torch.optim import SGD
 from tqdm.auto import tqdm
-
-from data.naobop_dataset import TrainNaoBopDataset as BaseDataset
-from engine.train_drv import TrainEngine as BaseEngine
 from utils.dataloader import get_dataloader
 from utils.schedulers import CosineAnnealingLR
+
+from engine.train_drv import TrainEngine as BaseEngine
 
 
 class TrainNaoBopDataset(BaseDataset):
@@ -53,14 +54,20 @@ class TrainEngine(BaseEngine):
         Returns:
             Dict: A dictionary containing training and validation datasets and dataloaders.
         """
-        # self.logger.info("Building training dataset.")
-        train_dataset = TrainNaoBopDataset(
-            data_root,
-            f"fold_{fold_num}_train.txt",
-            max_length,
-            car_ids=car_ids,
-        )
-        # self.logger.info("Building validation dataset.")
+        if self.cfg.brand == "brand1" and self.cfg.model_type != "DRVShift":
+            train_dataset = B1Dataset(
+                data_root,
+                brand_num=1,
+                car_ids=car_ids,
+                mode="train",
+            )
+        else:
+            train_dataset = TrainNaoBopDataset(
+                data_root,
+                f"fold_{fold_num}_train.txt",
+                max_length,
+                car_ids=car_ids,
+            )
         return {
             "train_dataset": train_dataset,
             "train_loader": get_dataloader(
@@ -75,9 +82,15 @@ class TrainEngine(BaseEngine):
     def run(self):
         """Run the training process."""
 
-        # car_info = pd.read_csv("/home/phuongnam/DistributedEVTest/data/battery_data/battery_brand3/label/all_label.csv")
-        # car_info = pd.read_csv("/home/phuongnam/DistributedEVTest/data/battery_data/battery_brand2/fold_label.csv")
-        car_info = pd.read_csv("/home/phuongnam/DistributedEVTest/data/battery_data/battery_brand1/fold_label.csv")
+        if self.cfg.brand == "brand3":
+            car_info = pd.read_csv(osp.join(self.cfg.data_root, "label", "all_label.csv"))
+        elif self.cfg.brand == "brand2" or self.cfg.model_type == "DRVShift":
+            car_info = pd.read_csv(osp.join(self.cfg.data_root, "fold_label.csv"))
+        else:
+            car_info1 = pd.read_csv(osp.join(self.cfg.data_root, "label", "train_label.csv"))
+            car_info2 = pd.read_csv(osp.join(self.cfg.data_root, "label", "test_label.csv"))
+            car_info = pd.concat([car_info1, car_info2], ignore_index=True)
+
         car_normal_ids = car_info[car_info["label"] == 0]["car"].unique().tolist()
 
         datasets = self.load_dataset(
