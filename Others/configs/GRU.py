@@ -4,9 +4,8 @@ from configs.base import Config as BaseConfig
 class Config(BaseConfig):
     def __init__(self):
         super(Config, self).__init__()
-        # Seed used in the paper for brand 1 (Dahu): 980, 2025, 3189, 6315, 8455
-        # Seed used in the paper for brand 3 (Naobop): 980, 2025, 3189, 6315, 8455
-        self.brand_num = 3
+        # Seed used in the paper: 980, 2025, 3189, 6315, 8455
+        self.brand_num = 1
         self.seed = 980
         self.model_type = "GRU"
         self.name = "GRU_{}_{}".format(self.brand_num, self.seed)

@@ -419,7 +419,7 @@ class EvaluateEngine(object):
     def run(self):
         """Run the training process."""
 
-        seed = 2025 if self.cfg.brand_num == 3 else self.cfg.seed
+        seed = 2025
         num_normal = -1
         num_abnormal = 1
         selected_groups = self.build_car_groups(num_normal=num_normal, num_abnormal=num_abnormal, seed=seed)
