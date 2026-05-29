@@ -96,7 +96,7 @@ class Config(BaseConfig):
 
         self.min_loss: float = 0.005
         self.batch_size: int = 128
-        self.num_epochs: int = 1000
+        self.num_epochs: int = 1000  # Might be changed to 100 for some experiments
         self.num_workers: int = 0
         self.pin_memory: bool = True
 
