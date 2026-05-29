@@ -99,11 +99,10 @@ class TrainEngine(object):
             car_info = pd.read_csv(osp.join(self.cfg.data_root, "battery_brand3", "label", "all_label.csv"))
             car_available_ids = car_info["car"].unique().tolist()
         else:
-            files = glob.glob(osp.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "data_by_segments", "*"))
-            car_available_ids = list(set([int(osp.basename(f).split("_")[0]) for f in files]))
             car_info1 = pd.read_csv(osp.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "label", "train_label.csv"))
             car_info2 = pd.read_csv(osp.join(self.cfg.data_root, f"battery_brand{self.cfg.brand_num}", "label", "test_label.csv"))
             car_info = pd.concat([car_info1, car_info2], ignore_index=True)
+            car_available_ids = car_info["car"].unique().tolist()
 
         car_normal_ids = car_info[car_info["label"] == 0]["car"].unique().tolist()
         car_abnormal_ids = car_info[car_info["label"] == 1]["car"].unique().tolist()
@@ -123,6 +122,15 @@ class TrainEngine(object):
             num_workers=self.cfg.num_workers,
             drop_last=False,
         )
+
+        if self.cfg.brand_num != 3:
+            test_dataset = self.get_dataloader(
+                test_dataset,
+                batch_size=1,
+                shuffle=False,
+                num_workers=self.cfg.num_workers,
+                drop_last=False,
+            )
         return train_dataloader, test_dataset, car_normal_ids, car_abnormal_ids
 
     def run(self):
@@ -152,14 +160,30 @@ class TrainEngine(object):
 
         self.logger.info(f"Training data shape: {x_train.shape}")
         self.logger.info(f"Training labels shape: {y_train.shape}")
+        self.logger.info(f"Training labels shape: {y_train_label.shape}")
 
         x_test = []
         y_test = []
         y_test_label = []
         for samples in tqdm(test_dataset, desc="Extracting features from test data"):
-            for batch in samples:
-                for k, v in batch.items():
-                    batch[k] = v.unsqueeze(0)
+            if self.cfg.brand_num == 3:
+                for batch in samples:
+                    for k, v in batch.items():
+                        batch[k] = v.unsqueeze(0)
+                    normed_time_series = batch["normed_time_series"].flatten(0, 1).detach().cpu().numpy()
+                    x_test.append(normed_time_series)
+                    label = batch["label"].flatten().detach().cpu().numpy()
+                    label = np.repeat(label, normed_time_series.shape[0])  # Repeat label to match the shape of normed_time_series
+                    car_id = batch["car"].flatten().detach().cpu().numpy()
+                    car_id = np.repeat(car_id, normed_time_series.shape[0])  # Repeat car_id to match the shape of normed_time_series
+                    charge_id = batch["charge_segment"].flatten().detach().cpu().numpy()
+                    charge_id = np.repeat(
+                        charge_id, normed_time_series.shape[0]
+                    )  # Repeat charge_id to match the shape of normed_time_series
+                    y_test.append(np.stack([label, car_id, charge_id], axis=1))
+                    y_test_label.append(label)
+            else:
+                batch = samples
                 normed_time_series = batch["normed_time_series"].flatten(0, 1).detach().cpu().numpy()
                 x_test.append(normed_time_series)
                 label = batch["label"].flatten().detach().cpu().numpy()
@@ -176,6 +200,7 @@ class TrainEngine(object):
         y_test_label = np.concatenate(y_test_label, axis=0)
         self.logger.info(f"Test data shape: {x_test.shape}")
         self.logger.info(f"Test labels shape: {y_test.shape}")
+        self.logger.info(f"Test labels shape: {y_test_label.shape}")
 
         self.logger.info("---------------- Starting PCA-based anomaly detection on test data ---------------")
         x_test_pca = x_test[:, 2:]  # Remove SOC, current.
@@ -251,6 +276,7 @@ class TrainEngine(object):
         best_y_pred_if = []
         best_y_true = []
         best_f1 = 0
+        best_ratio = 0
         for ratio in tqdm(range(3000)):
             ratio = ratio / 1000
             y_pred_if = []
