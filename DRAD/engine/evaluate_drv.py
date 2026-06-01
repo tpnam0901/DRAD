@@ -237,8 +237,8 @@ class EvaluateEngine(TrainEngine):
         # 4. Threshold Logic: Is this gap "big enough" to be a separate group?
         # We check if the max gap is at least 3x the average of other gaps
         avg_other_gaps = np.mean(gaps)
-
-        if max_gap > (avg_other_gaps * 2):
+        lambda_g = 2  # Original is 2
+        if max_gap > (avg_other_gaps * lambda_g):
             # Split into two groups
             group1 = dict(sorted_items[: max_gap_index + 1])
             group2 = dict(sorted_items[max_gap_index + 1 :])

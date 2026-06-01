@@ -7,7 +7,7 @@ class Config(BaseConfig):
     def __init__(self):
         super(Config, self).__init__()
         # Seed used in the paper for brand3 (Naobop): 980, 2025, 3189, 6315, 8455
-        self.seed = 8455 
+        self.seed = 2025
         self.brand = "brand3"
         self.data_root = f"data/battery_data/battery_{self.brand}"
         # Modify default parameters

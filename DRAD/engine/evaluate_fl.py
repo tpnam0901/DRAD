@@ -13,7 +13,7 @@ class EvaluateEngine(BaseEvaluateEngine):
             epoch (int): Current epoch number.
             keep_only_latest (bool): Whether to keep only the latest checkpoint. If True, save with the name 'latest.pth'.
         """
-        ckpt_path = osp.join(self.cfg.ckpt_dir, "{}_{}".format(self.cfg.name, self.cfg.current_time), "global__1000.pth")
+        ckpt_path = osp.join(self.cfg.ckpt_dir, "{}_{}".format(self.cfg.name, self.cfg.current_time), "global__500.pth")
         if not osp.exists(ckpt_path):
             raise FileNotFoundError(f"No checkpoint found at {ckpt_path}")
         # print("Loading checkpoint from:", ckpt_path)
