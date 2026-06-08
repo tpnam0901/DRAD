@@ -78,7 +78,7 @@ if __name__ == "__main__":
         elif cfg.model_type == "CNN":
             from engine.eval_cnn import EvaluateEngine
             from engine.train_cnn import TrainEngine
-        elif cfg.model_type == "GRU":
+        elif cfg.model_type == "GRU" or cfg.model_type == "DRV":
             from engine.eval_gru import EvaluateEngine
             from engine.train_gru import TrainEngine
         elif cfg.model_type == "TransGAN":

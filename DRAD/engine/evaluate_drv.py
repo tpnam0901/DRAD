@@ -35,6 +35,7 @@ class EvaluateEngine(TrainEngine):
         self.best_val_loss = float("inf")
         self.step = 1
         self.logger = logging.getLogger("EvaluateEngine")
+        self.logger.setLevel(logging.INFO)
 
         self.alpha = 1 if self.cfg.brand == "brand3" else 1.5
         self.beta = 2 if self.cfg.brand == "brand3" else 1
@@ -277,7 +278,7 @@ class EvaluateEngine(TrainEngine):
         plt.title("Error Matrix of Models vs. Data. Abnormal EV is: EV " + str(abnormal_car))
         plt.tight_layout()
         plt.savefig(osp.join(self.cfg.ckpt_dir, "{}_{}".format(self.cfg.name, self.cfg.current_time), f"cm_acar_{abnormal_car}.png"))
-
+        plt.close()
         # For each row_i and col_i, find sum of that row and column as the error score of that car
         car_error_scores = {}
         for i, car_id in enumerate(each_car_errors.keys()):
@@ -294,6 +295,7 @@ class EvaluateEngine(TrainEngine):
         plt.title("Abnormal EV is: EV " + str(abnormal_car))
         plt.tight_layout()
         plt.savefig(osp.join(self.cfg.ckpt_dir, "{}_{}".format(self.cfg.name, self.cfg.current_time), f"ces_acar_{abnormal_car}.png"))
+        plt.close()
 
     def load_checkpoint(self, model, car_id: int):
         """Save model checkpoint.
@@ -324,7 +326,7 @@ class EvaluateEngine(TrainEngine):
             group = selected_normals + [abnormal_car]
             selected_groups.append(group)
             selected_gt.append([0] * len(selected_normals) + [1])
-        print("The number of members in each group:", [len(group) for group in selected_groups])
+        self.logger.info("The number of members in each group: %s", [len(group) for group in selected_groups])
 
         return selected_groups, selected_gt
 
@@ -365,7 +367,7 @@ class EvaluateEngine(TrainEngine):
 
     def run(self):
         """Run the training process."""
-        print("Starting evaluation on {} dataset, fold {}".format(self.cfg.data_root, self.cfg.fold_num))
+        self.logger.info("Starting evaluation on {} dataset, fold {}".format(self.cfg.data_root, self.cfg.fold_num))
 
         if self.cfg.brand == "brand3":
             car_info = pd.read_csv(osp.join(self.cfg.data_root, "label", "all_label.csv"))
@@ -389,7 +391,8 @@ class EvaluateEngine(TrainEngine):
         cars_normal = [car_id for car_id in cars_normal if car_id in car_available_ids]
         cars_abnormal = [car_id for car_id in cars_abnormal if car_id in car_available_ids]
 
-        print("Normal cars:", cars_normal, "\nAbnormal cars:", cars_abnormal)
+        self.logger.info("Normal cars: %s", cars_normal)
+        self.logger.info("Abnormal cars: %s", cars_abnormal)
 
         selected_groups, selected_gt = self.get_groups(cars_normal, cars_abnormal)
 
@@ -407,61 +410,63 @@ class EvaluateEngine(TrainEngine):
             all_car_ids.extend(group)
             all_ground_truths.extend(gt)
             self.plot_error_matrix(each_car_errors, abnormal_car=group[-1])
-            print("Outlier detection using mean + 1.5 * std:")
+            self.logger.debug("Outlier detection using mean + 1.5 * std:")
             outliers, car_error_scores = self.find_outlier_with_mean_std(each_car_errors)
             preds = [1 if car_id in outliers else 0 for car_id in group]
             all_group_mean_std_preds.extend(preds)
-            print("Ground truth:", gt)
-            print("Predictions:", preds)
+            self.logger.debug("Ground truth: %s", gt)
+            self.logger.debug("Predictions: %s", preds)
             acc, f1, precision, recall = self.calculate_metrics(gt, preds)
             metrics["mean_std"]["acc"] = metrics["mean_std"].get("acc", []) + [acc]
             metrics["mean_std"]["f1"] = metrics["mean_std"].get("f1", []) + [f1]
             metrics["mean_std"]["precision"] = metrics["mean_std"].get("precision", []) + [precision]
             metrics["mean_std"]["recall"] = metrics["mean_std"].get("recall", []) + [recall]
-            print(f"F1: {f1:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}, Accuracy: {acc:.4f}")
-            print("Car error scores:", car_error_scores)
-            print("Outliers:", outliers.keys(), "abnormal car in this group:", group[-1])
-            print("--------------------")
-            print("Outlier detection using IQR:")
+            self.logger.debug("F1: %f, Precision: %f, Recall: %f, Accuracy: %f", f1, precision, recall, acc)
+            self.logger.debug("Car error scores: %s", car_error_scores)
+            self.logger.debug("Outliers: %s, abnormal car in this group: %s", list(outliers.keys()), group[-1])
+            self.logger.debug("--------------------")
+            self.logger.debug("Outlier detection using IQR:")
             outliers_iqr, car_error_scores_iqr = self.find_outlier_with_IQR(each_car_errors)
             preds = [1 if car_id in outliers_iqr else 0 for car_id in group]
             all_group_iqr_preds.extend(preds)
-            print("Ground truth:", gt)
-            print("Predictions:", preds)
+            self.logger.debug("Ground truth: %s", gt)
+            self.logger.debug("Predictions: %s", preds)
             acc, f1, precision, recall = self.calculate_metrics(gt, preds)
-            print("Car error scores (IQR):", car_error_scores_iqr)
-            print("Outliers (IQR):", outliers_iqr.keys(), "abnormal car in this group:", group[-1])
+            self.logger.debug("Car error scores (IQR): %s", car_error_scores_iqr)
+            self.logger.debug("Outliers (IQR): %s, abnormal car in this group: %s", list(outliers_iqr.keys()), group[-1])
             metrics["iqr"]["acc"] = metrics["iqr"].get("acc", []) + [acc]
             metrics["iqr"]["f1"] = metrics["iqr"].get("f1", []) + [f1]
             metrics["iqr"]["precision"] = metrics["iqr"].get("precision", []) + [precision]
             metrics["iqr"]["recall"] = metrics["iqr"].get("recall", []) + [recall]
-            print(f"F1: {f1:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}, Accuracy: {acc:.4f}")
-            print("==================")
-            print("Outlier detection using Grouping method:")
+            self.logger.debug("F1: %f, Precision: %f, Recall: %f, Accuracy: %f", f1, precision, recall, acc)
+            self.logger.debug("==================")
+            self.logger.debug("Outlier detection using Grouping method:")
             groups, car_error_scores_iqr = self.find_outlier_with_group(each_car_errors)
             for idx, grp in enumerate(groups):
-                print(f"Group {idx + 1}: {grp.keys()}")
+                self.logger.debug(f"Group {idx + 1}: {grp.keys()}")
             if len(groups) > 1:
                 preds = [1 if car_id in groups[1] else 0 for car_id in group]
             else:
                 preds = [0] * len(group)
             all_group_grouping_preds.extend(preds)
-            print("Ground truth:", gt)
-            print("Predictions:", preds)
+            self.logger.debug("Ground truth: %s", gt)
+            self.logger.debug("Predictions: %s", preds)
             acc, f1, precision, recall = self.calculate_metrics(gt, preds)
             metrics["grouping"]["acc"] = metrics["grouping"].get("acc", []) + [acc]
             metrics["grouping"]["f1"] = metrics["grouping"].get("f1", []) + [f1]
             metrics["grouping"]["precision"] = metrics["grouping"].get("precision", []) + [precision]
             metrics["grouping"]["recall"] = metrics["grouping"].get("recall", []) + [recall]
-            print(f"F1: {f1:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}, Accuracy: {acc:.4f}")
-            print("$$$$$")
-        print("Final averaged metrics over all groups:")
+            self.logger.debug("F1: %f, Precision: %f, Recall: %f, Accuracy: %f", f1, precision, recall, acc)
+            self.logger.debug("$$$$$")
+        self.logger.info("Final averaged metrics over all groups:")
         for method, vals in metrics.items():
             avg_acc = np.mean(vals["acc"])
             avg_f1 = np.mean(vals["f1"])
             avg_precision = np.mean(vals["precision"])
             avg_recall = np.mean(vals["recall"])
-            print(f"Method: {method} - Accuracy: {avg_acc:.4f}, F1: {avg_f1:.4f}, Precision: {avg_precision:.4f}, Recall: {avg_recall:.4f}")
+            self.logger.debug(
+                "Method: %s - Accuracy: %f, F1: %f, Precision: %f, Recall: %f", method, avg_acc, avg_f1, avg_precision, avg_recall
+            )
 
         # # Save all_group_errors to pickle file for plot
         # import pickle
@@ -470,19 +475,19 @@ class EvaluateEngine(TrainEngine):
         #     pickle.dump(all_group_errors, f)
 
         # Overall metrics
-        print("Overall metrics across all groups:")
-        print("Mean + 1.5 * std method:")
+        self.logger.info("Overall metrics across all groups:")
+        self.logger.info("Mean + 1.5 * std method:")
         acc, f1, precision, recall = self.calculate_metrics(all_ground_truths, all_group_mean_std_preds)
-        print(f"Accuracy: {acc:.4f}, F1: {f1:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}")
-        print("IQR method:")
+        self.logger.info(f"Accuracy: {acc:.4f}, F1: {f1:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}")
+        self.logger.info("IQR method:")
         acc, f1, precision, recall = self.calculate_metrics(all_ground_truths, all_group_iqr_preds)
-        print(f"Accuracy: {acc:.4f}, F1: {f1:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}")
-        print("Grouping method:")
+        self.logger.info(f"Accuracy: {acc:.4f}, F1: {f1:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}")
+        self.logger.info("Grouping method:")
         acc, f1, precision, recall = self.calculate_metrics(all_ground_truths, all_group_grouping_preds)
-        print(f"Accuracy: {acc:.4f}, F1: {f1:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}")
+        self.logger.info(f"Accuracy: {acc:.4f}, F1: {f1:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}")
 
         # Overall metrics after remove duplicate car ids (in case some cars appear in multiple groups)
-        print("Overall metrics across all groups after removing duplicate car ids:")
+        self.logger.info("Overall metrics across all groups after removing duplicate car ids:")
         filtered_gt = {}
         filtered_mean_std_preds = {}
         filtered_iqr_preds = {}
@@ -500,17 +505,17 @@ class EvaluateEngine(TrainEngine):
                 filtered_iqr_preds[car_id] = 1
             if grouping_pred == 1:
                 filtered_grouping_preds[car_id] = 1
-        print("Filtered Ground truth:", filtered_gt.keys())
-        print("Filtered Ground truth values:", filtered_gt.values())
-        print("Filtered Mean + 1.5 * std predictions:", filtered_mean_std_preds.values())
-        print("Filtered IQR predictions:", filtered_iqr_preds.values())
-        print("Filtered Grouping predictions:", filtered_grouping_preds.values())
+        self.logger.debug("Filtered Ground truth: %s", list(filtered_gt.keys()))
+        self.logger.debug("Filtered Ground truth values: %s", list(filtered_gt.values()))
+        self.logger.debug("Filtered Mean + 1.5 * std predictions: %s", list(filtered_mean_std_preds.values()))
+        self.logger.debug("Filtered IQR predictions: %s", list(filtered_iqr_preds.values()))
+        self.logger.debug("Filtered Grouping predictions: %s", list(filtered_grouping_preds.values()))
         acc, f1, precision, recall = self.calculate_metrics(list(filtered_gt.values()), list(filtered_mean_std_preds.values()))
-        print("Mean + 1.5 * std method:")
-        print(f"Accuracy: {acc:.4f}, F1: {f1:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}")
+        self.logger.info("Mean + 1.5 * std method:")
+        self.logger.info(f"Accuracy: {acc:.4f}, F1: {f1:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}")
         acc, f1, precision, recall = self.calculate_metrics(list(filtered_gt.values()), list(filtered_iqr_preds.values()))
-        print("IQR method:")
-        print(f"Accuracy: {acc:.4f}, F1: {f1:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}")
+        self.logger.info("IQR method:")
+        self.logger.info(f"Accuracy: {acc:.4f}, F1: {f1:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}")
         acc, f1, precision, recall = self.calculate_metrics(list(filtered_gt.values()), list(filtered_grouping_preds.values()))
-        print("Grouping method:")
-        print(f"Accuracy: {acc:.4f}, F1: {f1:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}")
+        self.logger.info("Grouping method:")
+        self.logger.info(f"Accuracy: {acc:.4f}, F1: {f1:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}")
