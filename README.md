@@ -90,9 +90,10 @@ cd DRAD/data
 - Preprocess the dataset. These scripts will merge all the charging sessions for each EV into a single file and generate the metadata for training and evaluation.
 
 ```bash
-python preprocess_data.py # For Naobop dataset
+python preprocess_brand3.py # For Naobop dataset
 python preprocess_brand2.py # For Socea dataset
 python preprocess_brand1.py # For Dahu dataset
+python preprocess_brand1_drift.py # For Dahu dataset with drift (for cross brand evaluation)
 ```
 
 #### DRAD
@@ -115,7 +116,7 @@ python main.py -m DRV -e t --config configs/DRV.py
 - Evaluation with same brand EVs:
 
 ```bash
-python main.py -m DRV -e e --config configs/DRV.py -cfg_ckpt checkpoints/DRV_DRV_brand3_20260415_135841/config.json
+python main.py -m DRV -e e --config configs/DRV.py -cfg_ckpt checkpoints/DRV_DRV_brand3_2025_20260518_190012/config.json
                   FL : Federal Learning
                   CL : Centralized Learning
 ```
@@ -124,14 +125,14 @@ python main.py -m DRV -e e --config configs/DRV.py -cfg_ckpt checkpoints/DRV_DRV
   - Pre-train the model on Dahu dataset:
 
   ```bash
-  # Modify the path to the dataset metadata in the `run()` function of the evaluation engine before running the code. TODO: move it to the configuration file.
+  # Modify the path to the dataset metadata in the `run()` function of the evaluation engine before running the code.
   python main.py -m CL -e t --config configs/DRV.py # Modify the configuration file to use Dahu dataset for pre-training
   ```
 
   - Fine-tune the model on the target dataset (for Socea and Naobop datasets):
 
   ```bash
-  # Modify the path to the dataset metadata in the `run()` function of the evaluation engine before running the code. TODO: move it to the configuration file.
+  # Modify the path to the dataset metadata in the `run()` function of the evaluation engine before running the code.
   python main.py -m DRV -e t --config configs/DRV_shift.py # Modify the self.pretrained_model_path with the path to the pre-trained model checkpoint. (all_normal_latest.pth)
   ```
 
@@ -144,7 +145,7 @@ python main.py -m DRV -e e --config configs/DRV.py -cfg_ckpt checkpoints/DRV_DRV
 python main.py -m DRV -e e --config configs/DRV_shift.py -cfg_ckpt checkpoints/DRV_DRVShift_brand3_20260422_143848/config.json -cfg_ckpt2 checkpoints/DRV_DRVShift_brand2_20260422_143231/config.json -cfg_ref checkpoints/CL_DRV_brand1_20260415_141406/config.json
 ```
 
-- All the checkpoints of DRAD are deposited in the [checkpoints]().
+- All the checkpoints of DRAD are deposited in the [checkpoints](https://github.com/tpnam0901/DRAD/releases).
 
 #### Other Baselines
 
@@ -220,10 +221,6 @@ python main.py -m CL -e e --config configs/BaselineName.py -cfg_ckpt working/che
   - Step 7: calculate the average performance across all groups and the overall performance across all EVs.
   - Note: function `plot_error_matrix()` can be used to visualize the error matrix for each group. Comment line `225 confusion_matrix[j, i] = each_car_errors[car_id][car_data_id]` for remove diagonal normalization in the error matrix.
   - Note: alpha and beta values will be adjusted in the `__init__()` function of the evaluation engine. TODO: move it to the configuration file.
-
-```bibtex
-
-```
 
 ## References
 
