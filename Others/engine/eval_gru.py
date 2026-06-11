@@ -22,6 +22,12 @@ class EvaluateEngine(TrainEngine):
             )
             self.cfg.data_root = "working/dataset/RFDBattery"
             self.cfg.model_type = "GRU"
+        if not osp.exists(ckpt_path):
+            ckpt_path = osp.join(
+                self.cfg.checkpoint_dir.replace("working/checkpoints/RFDBattery", "../DRAD/checkpoints"),
+                "{}_{}".format(self.cfg.name, self.cfg.current_time),
+                "global__500.pth",
+            )
         self.criterion_mse = torch.nn.MSELoss(reduction="none")
         _, test_dataset, _, _ = self.load_data()
 
