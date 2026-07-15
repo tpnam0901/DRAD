@@ -90,6 +90,7 @@ cd DRAD/data
 - Preprocess the dataset. These scripts will merge all the charging sessions for each EV into a single file and generate the metadata for training and evaluation.
 
 ```bash
+python build_label.py
 python preprocess_brand3.py # For Naobop dataset
 python preprocess_brand2.py # For Socea dataset
 python preprocess_brand1.py # For Dahu dataset
