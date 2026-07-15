@@ -1,9 +1,9 @@
 <h1 align="center">
-  DRAD: A Distributed Relational Anomaly Detection Framework for Electrical Vehicles at Charging Stations
+  Decentralized relational anomaly detection for electric vehicle batteries through independent learning
   <br>
 </h1>
 
-<h4 align="center">Official code repository for paper "DRAD: A Distributed Relational Anomaly Detection Framework for Electrical Vehicles at Charging Stations".</h4>
+<h4 align="center">Official code repository for the paper "Decentralized relational anomaly detection for electric vehicle batteries through independent learning".</h4>
 
 <p align="center">
 <a href=""><img src="https://img.shields.io/github/stars/tpnam0901/DRAD?" alt="stars"></a>
